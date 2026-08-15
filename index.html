@@ -186,6 +186,7 @@ button{background:none;border:0;cursor:pointer;font-family:inherit}
 .btn--ghost:hover:not(:disabled){background:var(--surface);color:var(--text);border-color:transparent;box-shadow:none}
 .btn--danger{color:var(--bad);border-color:rgba(255,107,90,.4)}
 .btn--sm{padding:7px var(--s3);font-size:.8125rem;border-radius:var(--r-sm)}
+.btn--lg{padding:13px var(--s5);font-size:1rem;border-radius:var(--r)}
 .btn--wide{width:100%}
 .btn__arrow{transition:transform .18s var(--ease);opacity:.85}
 .btn:hover:not(:disabled) .btn__arrow{transform:translateX(3px)}
@@ -592,6 +593,77 @@ button{background:none;border:0;cursor:pointer;font-family:inherit}
 }
 .pz-switch[aria-checked="true"]{background:var(--accent-soft);border-color:var(--accent-line)}
 .pz-switch[aria-checked="true"]::before{transform:translateX(18px);background:var(--accent)}
+
+/* ============================================================
+   home
+   ============================================================ */
+.home__greet{
+  display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+  gap:var(--s4);margin-bottom:var(--s5);
+}
+.home__hello{font-size:clamp(1.6rem,4vw,2.3rem)}
+.home__date{font-size:.9375rem;color:var(--muted);margin:var(--s2) 0 0}
+.home__line{font-size:.9375rem;color:var(--muted);margin:0;max-width:42ch;text-align:right}
+
+/* the hero: the one thing the screen is actually for */
+.hero-panel{
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s5);
+  background:linear-gradient(135deg,rgba(76,141,255,.16),transparent 62%),var(--surface);
+  border:1px solid var(--accent-line);border-radius:var(--r-xl);
+  padding:var(--s6);box-shadow:var(--lift-hi);
+  margin-bottom:var(--s5);
+}
+/* a soft bloom behind the ring, so the panel reads as lit rather than filled */
+.hero-panel::after{
+  content:'';position:absolute;right:-90px;top:-90px;width:280px;height:280px;
+  background:radial-gradient(circle,rgba(76,141,255,.18),transparent 68%);
+  pointer-events:none;
+}
+.hero-panel__body{position:relative;z-index:1;min-width:0}
+.hero-panel__title{font-size:clamp(1.5rem,3.6vw,2.1rem);font-weight:700;letter-spacing:-.028em;line-height:1.1;margin:var(--s2) 0 0}
+.hero-panel__stats{margin:var(--s5) 0}
+.hero-panel__note{font-size:.9375rem;color:var(--muted);margin:var(--s3) 0 var(--s5);max-width:46ch}
+.hero-panel__ring{position:relative;z-index:1;flex:none}
+.hero-panel__ring .ring{width:104px;height:104px}
+.hero-panel__ring .ringwrap span{font-size:1.0625rem}
+
+.home__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--s4)}
+.statcard{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:var(--s5);box-shadow:var(--lift);min-width:0;
+}
+.statcard--accent{border-color:var(--accent-line);background:linear-gradient(160deg,var(--accent-soft),transparent 70%),var(--surface)}
+.statcard--wide{grid-column:span 2}
+.statcard--full{grid-column:1/-1}
+.statcard__val{font-size:1.75rem;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:var(--s2) 0 0;line-height:1.1}
+.statcard__sub{font-size:.8125rem;color:var(--dim);margin:6px 0 0;line-height:1.5}
+.weekcard__row{display:flex;align-items:center;gap:var(--s4);margin-top:var(--s3)}
+.weekcard__big{font-size:1.125rem;font-weight:650;letter-spacing:-.02em;margin:0}
+
+/* the activity grid */
+.heat__scroll{overflow-x:auto;scrollbar-width:thin;padding-bottom:var(--s2)}
+.heat__grid{display:flex;gap:3px;min-width:min-content}
+.heat__col{display:flex;flex-direction:column;gap:3px}
+.heat__cell{
+  width:12px;height:12px;border-radius:3px;flex:none;display:block;
+  background:var(--bg-2);border:1px solid var(--line);
+}
+.heat__cell.lv-1{background:rgba(76,141,255,.28);border-color:rgba(76,141,255,.34)}
+.heat__cell.lv-2{background:rgba(76,141,255,.5);border-color:rgba(76,141,255,.55)}
+.heat__cell.lv-3{background:rgba(76,141,255,.72);border-color:rgba(76,141,255,.76)}
+.heat__cell.lv-4{background:var(--accent);border-color:var(--accent-hi)}
+.heat__cell.is-future{background:transparent;border-color:transparent}
+.heat__legend{display:flex;align-items:center;gap:4px;margin-top:var(--s3)}
+.heat__legend .u-note:first-child{margin-right:2px}
+.heat__legend .u-note:last-child{margin-left:2px}
+
+@media (max-width:720px){
+  .home__line{text-align:left}
+  .hero-panel{flex-direction:column;align-items:flex-start;padding:var(--s5)}
+  .hero-panel__ring{align-self:flex-end;margin-top:calc(var(--s5) * -1)}
+  .statcard--wide{grid-column:1/-1}
+}
 
 /* ============================================================
    progress view
@@ -2146,7 +2218,7 @@ const fmtW = n => (n == null || !isFinite(n)) ? '' : String(Math.round(n * 100) 
 
 /* ---------- app state ---------- */
 let S = store.load() || blankState();
-let hubTab = 'today';
+let hubTab = 'home';
 let openDay = null;
 let timer = null;
 let trendEx = null;
@@ -2343,7 +2415,7 @@ function renderTop() {
     return;
   }
   const tabs = h('nav', { class: 'nav', role: 'tablist', 'aria-label': 'Sections' });
-  [['today', 'Today'], ['week', 'Week'], ['progress', 'Progress']].forEach(([id, label]) => {
+  [['home', 'Home'], ['today', 'Today'], ['week', 'Week'], ['progress', 'Progress']].forEach(([id, label]) => {
     tabs.appendChild(h('button', {
       class: 'navlink', role: 'tab', 'aria-selected': hubTab === id ? 'true' : 'false',
       onclick: () => { hubTab = id; render(); }
@@ -2460,7 +2532,7 @@ function refreshFlowValidity() {
 function inSetup() { return !S.plan || !!S.editing; }
 function exitSetup() {
   S.editing = false;
-  hubTab = 'today';
+  hubTab = 'home';
   persist();
   render();
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -2901,7 +2973,7 @@ function buildAndGo() {
     S.createdAt = todayISO();
   }
   S.editing = false;
-  hubTab = 'today';
+  hubTab = 'home';
   openDay = null;
   persist();
   render();
@@ -3106,6 +3178,286 @@ function restDayCard() {
     ));
   });
   wrap.appendChild(list);
+  return wrap;
+}
+
+/* ============================================================
+   HUB: home
+   The landing screen. Everything here is derived from what you
+   have already logged — no new state, nothing to maintain — so it
+   reads as personal the moment there is anything to say, and says
+   something honest rather than nothing when there is not.
+   ============================================================ */
+function greeting() {
+  const hr = new Date().getHours();
+  if (hr < 5) return 'Still up';
+  if (hr < 12) return 'Good morning';
+  if (hr < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function isoAddDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/* Every distinct day with a logged session, oldest first. Two sessions
+   in one day is still one day of training. */
+function trainedDays() {
+  const seen = {};
+  S.history.forEach(x => { if (x && x.date) seen[x.date] = true; });
+  return Object.keys(seen).sort();
+}
+
+/* A streak of consecutive *days you trained* would break every rest day,
+   which would be a nonsense measure of consistency. Instead the allowed
+   gap comes from your own plan: train four days a week and up to three
+   days off is simply the plan working. Miss by more than that and the
+   streak is honestly broken. */
+function streakInfo() {
+  const days = trainedDays();
+  const perWeek = clamp((S.training && S.training.days) || 3, 1, 7);
+  const gapAllowed = Math.ceil(7 / perWeek) + 1;
+  if (!days.length) return { current: 0, best: 0, last: null, gapAllowed: gapAllowed, sinceLast: null };
+
+  let best = 1, run = 1;
+  for (let i = 1; i < days.length; i++) {
+    run = daysBetween(days[i - 1], days[i]) <= gapAllowed ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  let current = 1;
+  for (let i = days.length - 1; i > 0; i--) {
+    if (daysBetween(days[i - 1], days[i]) <= gapAllowed) current++; else break;
+  }
+  const last = days[days.length - 1];
+  const sinceLast = daysBetween(last, todayISO());
+  if (sinceLast > gapAllowed) current = 0;
+  return { current: current, best: best, last: last, gapAllowed: gapAllowed, sinceLast: sinceLast };
+}
+
+const HEAT_WEEKS = 18;
+/* Columns of seven days, Monday at the top, ending with the week we are
+   in — the same shape as the contribution grids everyone already knows
+   how to read. */
+function heatGrid(weeks) {
+  const byDate = {};
+  S.history.forEach(x => { if (x && x.date) byDate[x.date] = (byDate[x.date] || 0) + (x.sets || 0); });
+  const today = todayISO();
+  const end = isoAddDays(today, 6 - todayDow());          /* Sunday of this week */
+  const start = isoAddDays(end, -(weeks * 7 - 1));
+  const cols = [];
+  for (let w = 0; w < weeks; w++) {
+    const col = [];
+    for (let d = 0; d < 7; d++) {
+      const iso = isoAddDays(start, w * 7 + d);
+      col.push({ date: iso, sets: byDate[iso] || 0, future: iso > today });
+    }
+    cols.push(col);
+  }
+  return cols;
+}
+function heatLevel(sets) {
+  if (!sets) return 0;
+  if (sets <= 8) return 1;
+  if (sets <= 16) return 2;
+  if (sets <= 24) return 3;
+  return 4;
+}
+
+/* The next session still owed, counting from today. */
+function nextSession() {
+  const today = todayDow();
+  for (let off = 0; off < 7; off++) {
+    const d = S.plan.days.find(x => x.dow === (today + off) % 7);
+    if (d && !getLog(d.idx).done) return { day: d, inDays: off };
+  }
+  return null;
+}
+
+/* The lift that has moved the most since you started logging it. */
+function topLiftGain() {
+  const series = strengthSeries();
+  let best = null;
+  Object.keys(series).forEach(id => {
+    const pts = series[id];
+    if (pts.length < 2) return;
+    const gain = pts[pts.length - 1].v - pts[0].v;
+    if (best == null || gain > best.gain) best = { id: id, gain: gain, latest: pts[pts.length - 1].v };
+  });
+  return best;
+}
+
+/* One line that changes with where you actually are. */
+function homeLine(scheduled, doneToday) {
+  const st = streakInfo();
+  const doneThisWeek = S.plan.days.filter(d => getLog(d.idx).done).length;
+  const total = S.plan.days.length;
+  if (!S.history.length) return 'Your plan is built and waiting. The first session is the awkward one — after that it is just turning up.';
+  if (doneToday) return 'Today is logged. The growing happens between sessions, so the rest of today is doing its job too.';
+  if (st.current === 0 && st.sinceLast != null && st.sinceLast > st.gapAllowed) {
+    return 'It has been ' + st.sinceLast + ' days. Nothing is lost that a session this week will not get back.';
+  }
+  if (doneThisWeek >= total) return 'Every session this week is done. That is the whole week, finished.';
+  if (st.current >= 3) return st.current + ' sessions in a row without dropping off. Keep the run going.';
+  if (!scheduled) return 'Nothing scheduled today. Recovery is part of the plan, not a gap in it.';
+  return doneThisWeek + ' of ' + total + ' sessions done this week. ' + (total - doneThisWeek) + ' to go.';
+}
+
+function statCard(eyebrow, value, sub, opts) {
+  opts = opts || {};
+  return h('section', { class: 'statcard' + (opts.accent ? ' statcard--accent' : '') },
+    h('p', { class: 'u-eyebrow', text: eyebrow }),
+    h('p', { class: 'statcard__val', text: value }),
+    sub ? h('p', { class: 'statcard__sub', text: sub }) : null
+  );
+}
+
+function viewHome() {
+  const wrap = h('div', { class: 'home' });
+  const scheduled = S.plan.days.find(d => d.dow === todayDow());
+  const doneToday = !!(scheduled && getLog(scheduled.idx).done);
+
+  startClock();
+  wrap.appendChild(h('header', { class: 'home__greet' },
+    h('div', null,
+      h('h1', { class: 'u-h1 home__hello', text: greeting() }),
+      h('p', { class: 'home__date' },
+        todayLong() + ' · ',
+        h('span', { id: 'daybarClock', class: 'daybar__clock', text: nowClock() })
+      )
+    ),
+    h('p', { class: 'home__line', text: homeLine(scheduled, doneToday) })
+  ));
+
+  /* ---- the hero: whatever today actually is ---- */
+  const hero = h('section', { class: 'hero-panel' });
+  const heroBody = h('div', { class: 'hero-panel__body' });
+
+  if (scheduled && !doneToday) {
+    const totalSets = sum(scheduled.items.map(i => i.sets));
+    const doneSets = sum(scheduled.items.map(i => getEntry(scheduled.idx, i).filter(e => e.done).length));
+    const started = doneSets > 0;
+    heroBody.appendChild(h('p', { class: 'u-eyebrow', text: (started ? 'In progress · ' : 'Today · ') + DOW[scheduled.dow] }));
+    heroBody.appendChild(h('h2', { class: 'hero-panel__title', text: scheduled.label }));
+    heroBody.appendChild(h('div', { class: 'session__stats hero-panel__stats' },
+      stat('Exercises', String(scheduled.items.length)),
+      stat('Sets', doneSets + '/' + totalSets),
+      stat('Time', '~' + sessionMinutes(scheduled) + ' min')
+    ));
+    heroBody.appendChild(h('button', {
+      class: 'btn btn--primary btn--lg',
+      onclick: () => { openDay = scheduled.idx; hubTab = 'today'; render(); }
+    }, started ? 'Continue training' : 'Start training', h('span', { class: 'btn__arrow' }, '→')));
+    hero.appendChild(heroBody);
+    hero.appendChild(h('div', { class: 'hero-panel__ring' },
+      ring(totalSets ? doneSets / totalSets : 0, doneSets + '/' + totalSets)));
+  } else if (doneToday) {
+    heroBody.appendChild(h('p', { class: 'u-eyebrow', text: 'Done · ' + DOW[scheduled.dow] }));
+    heroBody.appendChild(h('h2', { class: 'hero-panel__title', text: scheduled.label }));
+    heroBody.appendChild(h('p', { class: 'hero-panel__note', text: 'Logged for week ' + S.week + '. Your weights carry into next week as the starting point.' }));
+    heroBody.appendChild(h('div', { class: 'row' },
+      h('button', { class: 'btn', onclick: () => { openDay = scheduled.idx; hubTab = 'today'; render(); } }, 'Review session'),
+      h('button', { class: 'btn btn--ghost', onclick: () => { hubTab = 'progress'; render(); } }, 'See progress')
+    ));
+    hero.appendChild(heroBody);
+    hero.appendChild(h('div', { class: 'hero-panel__ring' }, ring(1, '✓')));
+  } else {
+    const nxt = nextSession();
+    heroBody.appendChild(h('p', { class: 'u-eyebrow', text: 'Rest day' }));
+    heroBody.appendChild(h('h2', { class: 'hero-panel__title', text: 'Nothing scheduled' }));
+    heroBody.appendChild(h('p', { class: 'hero-panel__note',
+      text: nxt ? 'Next up is ' + nxt.day.label + ' on ' + DOW[nxt.day.dow] + '. You can train today anyway if you would rather.'
+                : 'The whole week is logged. Start a new week whenever you are ready.' }));
+    heroBody.appendChild(h('button', {
+      class: 'btn btn--primary btn--lg', onclick: () => { openDay = null; hubTab = 'today'; render(); }
+    }, 'Train anyway', h('span', { class: 'btn__arrow' }, '→')));
+    hero.appendChild(heroBody);
+  }
+  wrap.appendChild(hero);
+
+  /* ---- the cards ---- */
+  const grid = h('div', { class: 'home__grid' });
+  const st = streakInfo();
+  const doneThisWeek = S.plan.days.filter(d => getLog(d.idx).done).length;
+  const total = S.plan.days.length;
+  const nxt = nextSession();
+
+  /* week ring + next up */
+  const weekCard = h('section', { class: 'statcard statcard--wide' },
+    h('p', { class: 'u-eyebrow', text: 'This week' }),
+    h('div', { class: 'weekcard__row' },
+      ring(total ? doneThisWeek / total : 0, doneThisWeek + '/' + total),
+      h('div', null,
+        h('p', { class: 'weekcard__big', text: doneThisWeek === total ? 'Week complete' : doneThisWeek + ' of ' + total + ' done' }),
+        h('p', { class: 'statcard__sub',
+          text: nxt ? 'Next: ' + nxt.day.label + ' · ' + (nxt.inDays === 0 ? 'today' : nxt.inDays === 1 ? 'tomorrow' : DOW[nxt.day.dow])
+                    : 'Nothing left to do this week' })
+      )
+    )
+  );
+  grid.appendChild(weekCard);
+
+  /* streak */
+  grid.appendChild(statCard('Streak',
+    st.current > 0 ? st.current + (st.current === 1 ? ' session' : ' sessions') : 'None yet',
+    st.best > 0 ? 'Best run: ' + st.best + ' · a gap over ' + st.gapAllowed + ' days breaks it'
+                : 'Log a session to start one',
+    { accent: st.current >= 3 }));
+
+  /* strength, or lifetime volume when there is not enough to compare */
+  const gain = topLiftGain();
+  if (gain) {
+    const ex = LIB.find(x => x.id === gain.id);
+    grid.appendChild(statCard('Biggest gain',
+      (gain.gain >= 0 ? '+' : '') + fmt1(gain.gain) + ' kg',
+      (ex ? ex.name : gain.id) + ' · estimated max now ' + fmt1(gain.latest) + ' kg'));
+  } else {
+    grid.appendChild(statCard('Lifted so far',
+      fmt(sum(S.history.map(x => x.tonnage || 0))) + ' kg',
+      S.history.length ? 'Across ' + S.history.length + (S.history.length === 1 ? ' session' : ' sessions')
+                       : 'Your first session starts the count'));
+  }
+
+  /* heatmap */
+  const heat = h('section', { class: 'statcard statcard--full' });
+  heat.appendChild(h('div', { class: 'card__head' },
+    h('p', { class: 'u-eyebrow', text: 'Last ' + HEAT_WEEKS + ' weeks' }),
+    h('span', { class: 'u-note', text: trainedDays().length + ' days trained' })
+  ));
+  const scroller = h('div', { class: 'heat__scroll' });
+  const gridEl = h('div', { class: 'heat__grid' });
+  heatGrid(HEAT_WEEKS).forEach(col => {
+    const colEl = h('div', { class: 'heat__col' });
+    col.forEach(cell => {
+      colEl.appendChild(h('span', {
+        class: 'heat__cell' + (cell.future ? ' is-future' : ' lv-' + heatLevel(cell.sets)),
+        title: cell.future ? cell.date : cell.date + (cell.sets ? ' · ' + cell.sets + ' sets' : ' · rest')
+      }));
+    });
+    gridEl.appendChild(colEl);
+  });
+  scroller.appendChild(gridEl);
+  heat.appendChild(scroller);
+  heat.appendChild(h('div', { class: 'heat__legend' },
+    h('span', { class: 'u-note', text: 'Rest' }),
+    h('span', { class: 'heat__cell lv-0' }),
+    h('span', { class: 'heat__cell lv-1' }),
+    h('span', { class: 'heat__cell lv-2' }),
+    h('span', { class: 'heat__cell lv-3' }),
+    h('span', { class: 'heat__cell lv-4' }),
+    h('span', { class: 'u-note', text: 'Hard' })
+  ));
+  grid.appendChild(heat);
+
+  wrap.appendChild(grid);
+
+  wrap.appendChild(h('div', { class: 'row', style: { marginTop: 'var(--s5)' } },
+    h('button', { class: 'btn btn--sm', onclick: () => { hubTab = 'week'; render(); } }, 'See the whole week'),
+    h('button', { class: 'btn btn--sm', onclick: () => { hubTab = 'progress'; render(); } }, 'Progress'),
+    h('button', { class: 'btn btn--sm btn--ghost', onclick: () => goStep(2) }, 'Change my plan')
+  ));
+
   return wrap;
 }
 
@@ -3383,7 +3735,9 @@ function finishSession(day) {
   });
   stopTimer();
   persist();
-  hubTab = 'week';
+  /* land on Home: finishing is the moment the streak ticks up and a new
+     square fills in, and that is worth actually seeing */
+  hubTab = 'home';
   render();
 }
 
@@ -3463,7 +3817,7 @@ function viewWeek() {
       'Starting a new week clears the tick boxes and the reps, and keeps last week as your starting weights.'),
     h('div', { class: 'row', style: { marginTop: 'var(--s6)' } },
       confirmButton('Delete everything', 'Tap again to delete', 'btn btn--sm btn--ghost', () => {
-        store.clear(); S = blankState(); openDay = null; hubTab = 'today'; stopTimer(); render();
+        store.clear(); S = blankState(); openDay = null; hubTab = 'home'; stopTimer(); render();
       })
     ),
     h('p', { class: 'u-note', style: { marginTop: 'var(--s2)' } },
@@ -3513,7 +3867,7 @@ function startNewWeek() {
   });
   S.week++;
   openDay = null;
-  hubTab = 'today';
+  hubTab = 'home';
   persist();
   render();
 }
@@ -3687,7 +4041,7 @@ function transferCard() {
         const err = readPlanCode(box.value, S);
         if (err) { say(err, true); return; }
         rebuildPlan();
-        openDay = null; hubTab = 'today';
+        openDay = null; hubTab = 'home';
         persist(); render();
       } }, 'Load a pasted code')
     ),
@@ -3704,7 +4058,7 @@ function transferCard() {
       fr.onload = () => {
         const err = readBackup(String(fr.result), data => {
           S = data;
-          openDay = null; hubTab = 'today';
+          openDay = null; hubTab = 'home';
           persist(); render();
         });
         if (err) say(err, true);
@@ -3797,7 +4151,7 @@ function render() {
   if (inSetup()) {
     stage.appendChild(FLOW[clamp(S.step, 0, STEP_COUNT)]());
   } else {
-    stage.appendChild({ today: viewToday, week: viewWeek, progress: viewProgress }[hubTab]());
+    stage.appendChild(({ home: viewHome, today: viewToday, week: viewWeek, progress: viewProgress }[hubTab] || viewHome)());
   }
 }
 
@@ -4352,6 +4706,86 @@ function runSelfTests() {
     return b64ToUtf8(utf8ToB64(txt)) === txt || b64ToUtf8(utf8ToB64(txt));
   });
 
+  /* ---------- home ---------- */
+  t('a streak survives the rest days the plan itself prescribes', () => {
+    /* four days a week means gaps of two or three days are the plan
+       working, not a lapse */
+    const saved = { h: S.history, t: S.training, p: S.plan };
+    S.training = Object.assign({}, S.training, { days: 4 });
+    const today = todayISO();
+    S.history = [-9, -7, -4, -2, 0].map(o => ({ date: isoAddDays(today, o), sets: 10 }));
+    const st = streakInfo();
+    S.history = saved.h; S.training = saved.t; S.plan = saved.p;
+    return st.current === 5 || 'current was ' + st.current;
+  });
+  t('a real lapse breaks the streak', () => {
+    const saved = { h: S.history, t: S.training };
+    S.training = Object.assign({}, S.training, { days: 4 });
+    const today = todayISO();
+    S.history = [-40, -38, -36].map(o => ({ date: isoAddDays(today, o), sets: 10 }));
+    const st = streakInfo();
+    S.history = saved.h; S.training = saved.t;
+    return (st.current === 0 && st.best === 3) || 'current ' + st.current + ', best ' + st.best;
+  });
+  t('two sessions in one day count as one day of training', () => {
+    const saved = S.history;
+    S.history = [{ date: '2026-03-02', sets: 8 }, { date: '2026-03-02', sets: 9 }];
+    const n = trainedDays().length;
+    S.history = saved;
+    return n === 1 || 'counted ' + n;
+  });
+  t('the streak reads zero rather than crashing with no history at all', () => {
+    const saved = S.history;
+    S.history = [];
+    const st = streakInfo();
+    S.history = saved;
+    return (st.current === 0 && st.best === 0 && st.last === null) || JSON.stringify(st);
+  });
+  t('the activity grid is whole weeks and ends with the week we are in', () => {
+    const cols = heatGrid(HEAT_WEEKS);
+    if (cols.length !== HEAT_WEEKS) return 'got ' + cols.length + ' columns';
+    for (const c of cols) if (c.length !== 7) return 'a column had ' + c.length + ' days';
+    const last = cols[cols.length - 1];
+    const today = todayISO();
+    if (!last.some(c => c.date === today)) return 'today is not in the last column';
+    /* Monday at the top, Sunday at the bottom */
+    if (daysBetween(last[0].date, last[6].date) !== 6) return 'the last column is not seven consecutive days';
+    return true;
+  });
+  t('days that have not happened yet are marked, not drawn as rest', () => {
+    const cols = heatGrid(HEAT_WEEKS);
+    const today = todayISO();
+    for (const col of cols) {
+      for (const c of col) {
+        if (c.future !== (c.date > today)) return c.date + ' is marked future=' + c.future;
+      }
+    }
+    return true;
+  });
+  t('a logged day shows up in the grid with its sets', () => {
+    const saved = S.history;
+    const when = isoAddDays(todayISO(), -3);
+    S.history = [{ date: when, sets: 14 }];
+    const cell = heatGrid(HEAT_WEEKS).flat().find(c => c.date === when);
+    S.history = saved;
+    return (cell && cell.sets === 14 && heatLevel(cell.sets) === 2) || JSON.stringify(cell);
+  });
+  t('the heat level rises with the work done and never exceeds the scale', () => {
+    const lv = [0, 1, 8, 9, 16, 17, 24, 25, 400].map(heatLevel);
+    for (let i = 1; i < lv.length; i++) if (lv[i] < lv[i - 1]) return 'level went down: ' + lv.join(',');
+    return (heatLevel(0) === 0 && heatLevel(400) === 4) || lv.join(',');
+  });
+  t('the greeting is one of the four times of day', () => {
+    return ['Still up', 'Good morning', 'Good afternoon', 'Good evening'].indexOf(greeting()) >= 0 || greeting();
+  });
+  t('every hub tab resolves to a view', () => {
+    const views = { home: viewHome, today: viewToday, week: viewWeek, progress: viewProgress };
+    for (const id of ['home', 'today', 'week', 'progress']) {
+      if (typeof views[id] !== 'function') return id + ' has no view';
+    }
+    return true;
+  });
+
   /* ---------- personalize ---------- */
   t('settings() fills in defaults without touching what is already set', () => {
     const saved = S.settings;
@@ -4490,7 +4924,7 @@ window.addEventListener('error', e => {
     try {
       store.clear();
       S = blankState();
-      hubTab = 'today';
+      hubTab = 'home';
       openDay = null;
       render();
     } catch (err2) {
