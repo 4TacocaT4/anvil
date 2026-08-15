@@ -10,7 +10,16 @@
      data URI rather than a separate .ico: this file has to work opened straight
      off disk with no network and no sibling files next to it. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236BA2FF'/%3E%3Cstop offset='1' stop-color='%234C8DFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cg transform='translate(16,16) scale(1.5) translate(-8,-8)' fill='none' stroke='%23fff' stroke-width='2.3' stroke-linecap='round'%3E%3Cpath d='M2 8h12M4.5 4.5v7M11.5 4.5v7'/%3E%3C/g%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%234C8DFF'/%3E%3Cg transform='translate(16,16) scale(1.5) translate(-8,-8)' fill='none' stroke='%23fff' stroke-width='2.3' stroke-linecap='round'%3E%3Cpath d='M2 8h12M4.5 4.5v7M11.5 4.5v7'/%3E%3C/g%3E%3C/svg%3E">
+<!-- Installable, and it keeps working with no signal. Both of these are
+     optional extras for the hosted copy: opened straight off disk they
+     simply 404 and nothing changes. iOS wants a real PNG here, which is
+     why this one is a file and the tab icon above is not. -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Anvil">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Anvil</title>
 <style>
 /* ============================================================
@@ -812,6 +821,14 @@ button.chip:active{transform:scale(.94)}
 
 /* the activity grid */
 .heat__scroll{overflow-x:auto;scrollbar-width:thin;padding-bottom:var(--s2)}
+.heat__stack{display:inline-block;min-width:min-content}
+/* the month row uses the same 12px column and 3px gap as the grid below
+   it, so a label sits over the week it names */
+.heat__months{display:flex;gap:3px;margin-bottom:5px}
+.heat__month{
+  width:12px;flex:none;font-size:.625rem;font-weight:600;color:var(--dim);
+  white-space:nowrap;line-height:1;
+}
 .heat__grid{display:flex;gap:3px;min-width:min-content}
 .heat__col{display:flex;flex-direction:column;gap:3px}
 .heat__cell{
@@ -963,6 +980,35 @@ button.chip:active{transform:scale(.94)}
 }
 
 /* ============================================================
+   installed to a home screen
+   Standalone, the page owns the whole display: the strip behind the
+   clock and the bar the home gesture lives on are ours to avoid.
+   env() resolves to 0px in an ordinary browser tab, so none of this
+   costs anything there. It sits after the responsive rules because
+   those set padding with the shorthand and would otherwise win.
+   ============================================================ */
+@supports (padding:env(safe-area-inset-top)){
+  .topbar__inner{padding-top:calc(var(--s3) + env(safe-area-inset-top))}
+  .stage{
+    padding-left:max(var(--s4),env(safe-area-inset-left));
+    padding-right:max(var(--s4),env(safe-area-inset-right));
+    padding-bottom:calc(var(--s8) + env(safe-area-inset-bottom));
+  }
+  .timer{bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
+  .pz-overlay{padding-bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
+}
+@media (min-width:641px){
+  @supports (padding:env(safe-area-inset-top)){
+    .stage{
+      padding-left:max(var(--s5),env(safe-area-inset-left));
+      padding-right:max(var(--s5),env(safe-area-inset-right));
+      padding-bottom:calc(var(--s9) + env(safe-area-inset-bottom));
+    }
+    .timer{bottom:calc(var(--s5) + env(safe-area-inset-bottom))}
+  }
+}
+
+/* ============================================================
    reduced motion
    ============================================================ */
 @media (prefers-reduced-motion:reduce){
@@ -1040,6 +1086,9 @@ button.chip:active{transform:scale(.94)}
 </div>
 <div id="timerMount"></div>
 <div id="personalizeMount"></div>
+<!-- One stable live region. Things worth saying out loud get written
+     here; nothing that changes every second goes near it. -->
+<div id="live" class="u-vh" role="status" aria-live="polite"></div>
 <noscript>
   <div style="position:fixed;inset:auto 0 0 0;padding:16px;background:#FF6B5A;color:#1a0500;font:15px/1.5 system-ui,sans-serif;text-align:center">
     JavaScript is turned off, so Anvil cannot build your plan. Turn it on and reload.
@@ -2429,6 +2478,7 @@ let personalizeOpen = false;
 let animateIn = true;
 let pzAnimate = false;
 let lastViewKey = '';
+let installPrompt = null;
 const REDUCED_MOTION = (function () {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
   catch (e) { return false; }
@@ -2444,6 +2494,16 @@ function stagger(el, i, step, base) {
   return el;
 }
 
+/* Say something once, out loud, to anyone using a screen reader. The
+   region is cleared first so repeating the same message still counts as
+   a change worth announcing. */
+function announce(msg) {
+  const el = document.getElementById('live');
+  if (!el) return;
+  el.textContent = '';
+  setTimeout(() => { el.textContent = msg; }, 60);
+}
+
 /* Replays a one-shot animation class: remove, force a reflow so the
    browser sees the class actually leave, then add it back. */
 function pulse(el, cls) {
@@ -2453,7 +2513,31 @@ function pulse(el, cls) {
   el.classList.add(cls);
 }
 
-function persist() { store.save(S); }
+function persist() {
+  if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+  store.save(S);
+}
+
+/* Typing a weight fires oninput on every keystroke, and a plain persist()
+   there means JSON.stringify over the whole plan and history per
+   character — the one thing in this app that is genuinely wasteful.
+   Deferred writes coalesce a burst of typing into a single save.
+   Everything else keeps writing immediately: those are one-off actions
+   where the write is already cheap and being certain matters more. */
+let persistTimer = null;
+const PERSIST_DELAY = 400;
+function persistSoon() {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => { persistTimer = null; store.save(S); }, PERSIST_DELAY);
+}
+/* the tab can be closed or backgrounded mid-burst, so any pending write
+   is flushed the moment the page stops being visible */
+function flushPersist() {
+  if (!persistTimer) return;
+  clearTimeout(persistTimer);
+  persistTimer = null;
+  store.save(S);
+}
 function syncAge() { CURRENT_AGE = (S.profile.age && isFinite(S.profile.age)) ? S.profile.age : 30; }
 
 /* ============================================================
@@ -2505,6 +2589,15 @@ async function requestWakeLock() {
 function releaseWakeLock() {
   try { if (wakeLockSentinel) wakeLockSentinel.release(); } catch (e) {}
   wakeLockSentinel = null;
+}
+
+/* Running from a home-screen icon rather than a browser tab. Chrome and
+   friends report it through display-mode; iOS has its own flag. */
+function isStandalone() {
+  try {
+    if (window.matchMedia('(display-mode: standalone)').matches) return true;
+  } catch (e) { /* older browsers have no display-mode query */ }
+  return navigator.standalone === true;
 }
 
 function pzSwitch(checked, onToggle) {
@@ -2618,6 +2711,26 @@ function paintPersonalize() {
         if (settings().wakeLock) requestWakeLock(); else releaseWakeLock();
         paintPersonalize();
       })));
+  }
+
+  /* Installing is the difference between a browser tab you have to find
+     again and an icon on the home screen that opens with no address bar
+     and no signal. The row only exists when the browser has actually
+     offered the prompt, so it is never a button that does nothing. */
+  if (installPrompt) {
+    panel.appendChild(pzRow('Install Anvil', 'Puts it on your home screen and lets it open without a connection.',
+      h('button', {
+        class: 'btn btn--sm btn--primary',
+        onclick: () => {
+          const p = installPrompt;
+          installPrompt = null;
+          paintPersonalize();
+          try { p.prompt(); } catch (e) { /* the prompt is single use; a second call throws */ }
+        }
+      }, 'Install')));
+  } else if (isStandalone()) {
+    panel.appendChild(pzRow('Installed', 'Anvil is running from your home screen and works with no connection.',
+      h('span', { class: 'chip', text: 'Ready offline' })));
   }
 
   if (pzAnimate) {
@@ -3345,7 +3458,11 @@ function startTimer(seconds, label) {
        rather than throwing on a null once a second forever */
     if (!timer || timer.id !== id) { clearInterval(id); return; }
     timer.left--;
-    if (timer.left <= 0 && !timer.up) { timer.up = true; timer.left = 0; beep(); vibrateAlert(); }
+    if (timer.left <= 0 && !timer.up) {
+      timer.up = true; timer.left = 0;
+      beep(); vibrateAlert();
+      announce('Rest is up. ' + timer.label);
+    }
     if (timer.left <= -30) { stopTimer(); return; }
     paintTimer();
   }, 1000);
@@ -3366,7 +3483,11 @@ function paintTimer() {
   sv.appendChild(s('circle', { class: 'timer__track', cx: 18, cy: 18, r: R }));
   sv.appendChild(s('circle', { class: 'timer__arc', cx: 18, cy: 18, r: R, 'stroke-dasharray': C, 'stroke-dashoffset': C * (1 - frac) }));
 
-  mount.appendChild(h('div', { class: 'timer' + (timer.up ? ' is-up' : ''), role: 'status', 'aria-live': 'polite' },
+  /* Not a live region: this element is rebuilt every second, and a live
+     region here would have a screen reader read the countdown out one
+     tick at a time. The one thing worth announcing — that the rest is
+     over — is announced once, from startTimer, through #live. */
+  mount.appendChild(h('div', { class: 'timer' + (timer.up ? ' is-up' : ''), role: 'timer', 'aria-label': (timer.up ? 'Rest is up' : timer.label) },
     sv,
     h('div', null,
       h('span', { class: 'timer__label', text: timer.up ? 'Time is up' : timer.label }),
@@ -3515,6 +3636,7 @@ function streakInfo() {
 }
 
 const HEAT_WEEKS = 18;
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /* Home entrance timing, in order: the greeting, then the hero, then the
    cards one after another, then the heat wave inside the last card. Each
    stage waits for the one before it, so the screen assembles rather than
@@ -3711,7 +3833,19 @@ function viewHome() {
   ));
   const scroller = h('div', { class: 'heat__scroll' });
   const gridEl = h('div', { class: 'heat__grid' });
-  heatGrid(HEAT_WEEKS).forEach((col, ci) => {
+  const cols = heatGrid(HEAT_WEEKS);
+  /* A month name over the first column that falls in it. Without these
+     it is eighteen anonymous squares wide and you cannot tell whether a
+     gap was last month or in the spring. */
+  const months = h('div', { class: 'heat__months' });
+  let lastMonth = '';
+  cols.forEach(col => {
+    const m = col[0].date.slice(0, 7);
+    const label = m === lastMonth ? '' : MONTH_SHORT[Number(col[0].date.slice(5, 7)) - 1];
+    lastMonth = m;
+    months.appendChild(h('span', { class: 'heat__month', text: label }));
+  });
+  cols.forEach((col, ci) => {
     /* the wave crosses the whole grid in about a third of a second, which
        is fast enough to read as one gesture rather than 18 separate ones.
        It starts after HEAT_DELAY because the card it lives in is itself
@@ -3726,7 +3860,7 @@ function viewHome() {
     });
     gridEl.appendChild(colEl);
   });
-  scroller.appendChild(gridEl);
+  scroller.appendChild(h('div', { class: 'heat__stack' }, months, gridEl));
   heat.appendChild(scroller);
   heat.appendChild(h('div', { class: 'heat__legend' },
     h('span', { class: 'u-note', text: 'Rest' }),
@@ -3904,22 +4038,25 @@ function exerciseCard(day, item, i) {
   ));
 
   const inputs = [];
+  const rowRefs = [];
   const sets = h('div', { class: 'sets' });
   entry.forEach((e, si) => {
     const row = h('div', { class: 'setrow' + (e.done ? ' is-done' : '') });
     const wIn = h('input', {
       class: 'setrow__input', type: 'number', inputmode: 'decimal', step: '0.5', min: '0',
+      enterkeyhint: 'next',
       value: e.w == null ? '' : e.w,
       placeholder: opening != null ? fmtW(opening) : (item.kind === 'bodyweight' ? '0' : '—'),
       'aria-label': 'Weight for set ' + (si + 1),
-      oninput: ev => { e.w = ev.target.value === '' ? null : Number(ev.target.value); persist(); repaintPlates(); }
+      oninput: ev => { e.w = ev.target.value === '' ? null : Number(ev.target.value); persistSoon(); repaintPlatesSoon(); }
     });
     inputs.push(wIn);
     const rIn = h('input', {
       class: 'setrow__input', type: 'number', inputmode: 'numeric', step: '1', min: '0',
+      enterkeyhint: si === entry.length - 1 ? 'done' : 'next',
       value: e.r == null ? '' : e.r, placeholder: String(item.reps[0]),
       'aria-label': (item.unit === 'sec' ? 'Seconds' : 'Reps') + ' for set ' + (si + 1),
-      oninput: ev => { e.r = ev.target.value === '' ? null : Number(ev.target.value); persist(); }
+      oninput: ev => { e.r = ev.target.value === '' ? null : Number(ev.target.value); persistSoon(); }
     });
     const ok = h('button', {
       class: 'setrow__done', 'aria-pressed': e.done ? 'true' : 'false',
@@ -3944,11 +4081,44 @@ function exerciseCard(day, item, i) {
     row.appendChild(h('span', { class: 'setrow__n', text: String(si + 1) }));
     row.appendChild(wIn); row.appendChild(rIn); row.appendChild(ok);
     sets.appendChild(row);
+    rowRefs.push({ wIn: wIn, rIn: rIn, ok: ok, e: e });
+  });
+
+  /* Logging a set should be one run of keystrokes, not a tap into every
+     box. Enter walks weight → reps → tick, and lands on the next set's
+     weight ready to type. Wired after the loop because a row needs to
+     know about the one below it. */
+  rowRefs.forEach((r, si) => {
+    const next = rowRefs[si + 1];
+    r.wIn.addEventListener('keydown', ev => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      r.rIn.focus();
+      r.rIn.select();
+    });
+    r.rIn.addEventListener('keydown', ev => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      /* Enter means "that set is logged". If it is already ticked, do
+         not untick it — that would make a second Enter undo the first. */
+      if (!r.e.done) r.ok.click();
+      if (next) { next.wIn.focus(); next.wIn.select(); }
+      else r.rIn.blur();
+    });
   });
   body.appendChild(sets);
 
   /* plate maths and the warm-up ramp, redrawn whenever a weight changes */
   let plateHost = null;
+  let plateFrame = 0;
+  /* Rebuilding the plate diagram and the warm-up ramp is a dozen SVG
+     nodes thrown away and remade. Doing that per keystroke means typing
+     "1 0 0" redraws it three times to show two intermediate states
+     nobody wanted to see, so it is collapsed to one redraw per frame. */
+  function repaintPlatesSoon() {
+    if (plateFrame) return;
+    plateFrame = requestAnimationFrame(() => { plateFrame = 0; repaintPlates(); });
+  }
   function currentWeight() {
     const ws = entry.map(e => (e.w == null ? 0 : Number(e.w))).filter(w => w > 0);
     if (ws.length) return Math.max.apply(null, ws);
@@ -4027,6 +4197,7 @@ function finishSession(day) {
   });
   stopTimer();
   persist();
+  announce(day.label + ' logged for week ' + S.week + '.');
   /* land on Home: finishing is the moment the streak ticks up and a new
      square fills in, and that is worth actually seeing */
   hubTab = 'home';
@@ -5120,6 +5291,50 @@ function runSelfTests() {
   t('the greeting is one of the four times of day', () => {
     return ['Still up', 'Good morning', 'Good afternoon', 'Good evening'].indexOf(greeting()) >= 0 || greeting();
   });
+  t('a month name is labelled once, over the first week that falls in it', () => {
+    const cols = heatGrid(HEAT_WEEKS);
+    const labels = [];
+    let last = '';
+    cols.forEach(col => {
+      const m = col[0].date.slice(0, 7);
+      if (m !== last) labels.push(MONTH_SHORT[Number(col[0].date.slice(5, 7)) - 1]);
+      last = m;
+    });
+    /* 18 weeks spans four or five month starts, and no two adjacent
+       labels may repeat or the row is mislabelled */
+    if (labels.length < 4 || labels.length > 6) return 'got ' + labels.length + ' labels: ' + labels.join(',');
+    for (let i = 1; i < labels.length; i++) if (labels[i] === labels[i - 1]) return 'repeated ' + labels[i];
+    return true;
+  });
+  t('every month index maps to a name', () => {
+    if (MONTH_SHORT.length !== 12) return 'got ' + MONTH_SHORT.length;
+    return MONTH_SHORT.every(n => typeof n === 'string' && n.length === 3) || 'bad name';
+  });
+  t('a deferred write is scheduled, and flushing makes it land at once', () => {
+    /* localStorage throws outright in a sandboxed or opaque origin, so
+       the scheduling contract is always checked and the round-trip only
+       where there is somewhere to write to */
+    const storageWorks = store.save(S);
+    const before = S.step;
+    S.step = 4;
+    persistSoon();
+    if (!persistTimer) return 'persistSoon did not schedule anything';
+    flushPersist();
+    if (persistTimer) return 'flushPersist left a pending write behind';
+    let landed = true;
+    if (storageWorks) {
+      const raw = store.load();
+      landed = !!(raw && raw.step === 4);
+    }
+    S.step = before;
+    persist();
+    return landed || 'the flushed write did not reach storage';
+  });
+  t('an immediate write cancels a deferred one rather than racing it', () => {
+    persistSoon();
+    persist();
+    return persistTimer === null || 'a deferred write survived persist()';
+  });
   t('every hub tab resolves to a view', () => {
     const views = { home: viewHome, today: viewToday, week: viewWeek, progress: viewProgress };
     for (const id of ['home', 'today', 'week', 'progress']) {
@@ -5247,6 +5462,33 @@ window.addEventListener('error', e => {
     if (e.key !== 'Escape') return;
     if (personalizeOpen) closePersonalize();
     else if (timer) stopTimer();
+  });
+
+  /* Register the service worker so the app opens with no signal. Only
+     over http(s): from a file:// URL there is no scope to register
+     against, and the app is already local anyway. A failure here is
+     never fatal — the page has just finished rendering without it. */
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is a bonus, not a requirement */ });
+    });
+  }
+
+  /* Chrome hands over the install prompt exactly once and only when it
+     decides the app qualifies. Hold on to it so Personalize can offer
+     the button, rather than hoping the user finds the browser menu. */
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installPrompt = e;
+    if (personalizeOpen) paintPersonalize();
+  });
+  window.addEventListener('appinstalled', () => { installPrompt = null; });
+
+  /* a pending write must not be lost to a closed tab or a phone that
+     goes to sleep mid-set */
+  window.addEventListener('pagehide', flushPersist);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPersist();
   });
 
   /* the nav pill is positioned in pixels, so it has to be re-measured
