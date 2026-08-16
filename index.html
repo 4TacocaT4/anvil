@@ -5563,46 +5563,49 @@ function runSelfTests() {
   t('30 minutes is one of the offered answers', () => {
     return SESSION_MINUTE_CHOICES.indexOf(SESSION_MINUTES_DEFAULT) >= 0 || SESSION_MINUTE_CHOICES.join(',');
   });
+  /* These build their own plan rather than reading S.plan: ?selftest=1 is
+     most likely to be opened by someone who has not been through setup
+     yet, and a test that only passes once you happen to have a plan
+     saved is a test that reports the wrong thing. */
+  const gatePlan = buildPlan(cfg({}));
+  const gateDay = gatePlan.days[0];
+
   t('a shorter answer never gives you more work than a longer one', () => {
-    const day = S.plan.days[0];
     let prev = -1;
     for (const m of SESSION_MINUTE_CHOICES) {
-      const n = fitToMinutes(day, m).core.length;
+      const n = fitToMinutes(gateDay, m).core.length;
       if (n < prev) return m + ' min gave ' + n + ' exercises, less than the answer below it';
       prev = n;
     }
     return true;
   });
   t('what fits is the front of the plan, not a selection out of it', () => {
-    const day = S.plan.days[0];
-    const fit = fitToMinutes(day, 30);
+    const fit = fitToMinutes(gateDay, 30);
     for (let i = 0; i < fit.core.length; i++) {
-      if (fit.core[i] !== day.items[i]) return 'exercise ' + (i + 1) + ' is not the one the plan put there';
+      if (fit.core[i] !== gateDay.items[i]) return 'exercise ' + (i + 1) + ' is not the one the plan put there';
     }
     return true;
   });
   t('nothing is lost: what fits plus what does not is the whole day', () => {
-    const day = S.plan.days[0];
     for (const m of [20, 30, 45, 90]) {
-      const fit = fitToMinutes(day, m);
-      if (fit.core.length + fit.extra.length !== day.items.length) {
-        return m + ' min accounted for ' + (fit.core.length + fit.extra.length) + ' of ' + day.items.length;
+      const fit = fitToMinutes(gateDay, m);
+      if (fit.core.length + fit.extra.length !== gateDay.items.length) {
+        return m + ' min accounted for ' + (fit.core.length + fit.extra.length) + ' of ' + gateDay.items.length;
       }
       const seen = fit.core.concat(fit.extra);
-      for (let i = 0; i < day.items.length; i++) if (seen[i] !== day.items[i]) return m + ' min reordered the day';
+      for (let i = 0; i < gateDay.items.length; i++) if (seen[i] !== gateDay.items[i]) return m + ' min reordered the day';
     }
     return true;
   });
   t('even the shortest answer still gives a real session', () => {
-    const day = S.plan.days[0];
-    const fit = fitToMinutes(day, SESSION_MINUTE_CHOICES[0]);
-    const floor = Math.min(minItemsFor(SESSION_MINUTE_CHOICES[0]), day.items.length);
+    const fit = fitToMinutes(gateDay, SESSION_MINUTE_CHOICES[0]);
+    const floor = Math.min(minItemsFor(SESSION_MINUTE_CHOICES[0]), gateDay.items.length);
     return fit.core.length >= floor || 'got ' + fit.core.length + ', floor is ' + floor;
   });
   t('asking for the length the app itself quotes gives the whole session', () => {
     /* the quoted length is rounded, so this is the case where a fraction
        of a minute could silently drop the last exercise */
-    for (const day of S.plan.days) {
+    for (const day of gatePlan.days) {
       const quoted = sessionMinutes(day);
       const fit = fitToMinutes(day, quoted);
       if (fit.extra.length) {
@@ -5612,20 +5615,18 @@ function runSelfTests() {
     return true;
   });
   t('no answer at all means the whole session, unchanged', () => {
-    const day = S.plan.days[0];
-    const fit = fitToMinutes(day, null);
-    return (fit.core.length === day.items.length && fit.extra.length === 0) ||
+    const fit = fitToMinutes(gateDay, null);
+    return (fit.core.length === gateDay.items.length && fit.extra.length === 0) ||
       'got ' + fit.core.length + '/' + fit.extra.length;
   });
-  t('the question is asked again the week after it was answered', () => {
-    const day = S.plan.days[0];
-    const log = getLog(day.idx);
+  t('an answered session reports its length, a cleared one asks again', () => {
+    const log = getLog(gateDay.idx);
     const before = log.minutes;
     log.minutes = 45;
-    const wasAsked = sessionBudget(day.idx) === 45;
-    /* startNewWeek does the clearing; this checks the field it clears */
+    const wasAsked = sessionBudget(gateDay.idx) === 45;
+    /* startNewWeek clears this field; this checks what clearing it does */
     log.minutes = null;
-    const asksAgain = sessionBudget(day.idx) === null;
+    const asksAgain = sessionBudget(gateDay.idx) === null;
     log.minutes = before;
     return (wasAsked && asksAgain) || 'budget did not reset';
   });
