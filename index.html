@@ -607,6 +607,46 @@ button.chip:active{transform:scale(.94)}
   font-size:.6875rem;font-weight:700;color:var(--accent-hi);
 }
 
+/* ---- how long have you got ---- */
+.gate{
+  background:linear-gradient(150deg,rgba(76,141,255,.1),transparent 60%),var(--surface);
+  border-color:var(--accent-line);
+}
+.gate__title{margin:var(--s3) 0 var(--s3)}
+.gate__lede{margin-bottom:var(--s5)}
+.gate__choices{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.gate__chip{
+  padding:10px var(--s4);border-radius:var(--r-pill);
+  border:1px solid var(--line-hi);background:var(--bg-2);
+  color:var(--muted);font-size:.9375rem;font-weight:600;font-variant-numeric:tabular-nums;
+  transition:color var(--t) var(--ease-out),border-color var(--t) var(--ease-out),
+             background var(--t) var(--ease-out),transform var(--t) var(--spring);
+}
+.gate__chip:hover{color:var(--text);border-color:var(--muted)}
+.gate__chip:active{transform:scale(.94)}
+.gate__chip[aria-pressed="true"]{
+  background:linear-gradient(180deg,var(--accent-hi),var(--accent));
+  border-color:transparent;color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 20px -8px rgba(76,141,255,.85);
+}
+/* the same chips, shrunk to sit on one row of the personalize panel */
+.gate__choices--tight{justify-content:flex-end;max-width:200px;gap:4px}
+.gate__choices--tight .gate__chip{padding:5px 9px;font-size:.8125rem;font-weight:550}
+.gate__summary{
+  margin:var(--s4) 0 0;font-size:.9375rem;color:var(--accent-hi);
+  min-height:1.5em;line-height:1.5;
+}
+.gate__actions{margin-top:var(--s5)}
+.stat__change{margin-left:var(--s2);vertical-align:middle;padding:2px 10px;font-size:.75rem}
+
+/* what did not fit in the time you said you had */
+.extras__head{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;
+  margin:var(--s7) 0 var(--s4);padding-top:var(--s5);border-top:1px dashed var(--line-hi);
+}
+.ex--extra{border-style:dashed;box-shadow:none;background:transparent}
+.ex--extra:hover{background:var(--surface)}
+
 .restrow{
   display:flex;align-items:center;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;
   margin:0 0 var(--s4);
@@ -1804,6 +1844,51 @@ function sessionMinutes(session) {
   return Math.round(sum(session.items.map(exerciseMinutes)));
 }
 
+/* How long you say you have when you walk in, and what fits in it.
+
+   The plan lists a day's exercises in priority order — the main lift
+   first, accessories last — so "what fits" is a prefix of that list
+   rather than a selection out of it. Taking a prefix is also the only
+   honest answer: dropping the squat to keep two arm exercises because
+   they happened to add up more neatly is not a shorter version of the
+   session, it is a different one.
+
+   Nothing here removes an exercise from the plan. What does not fit is
+   still shown, still loggable, just marked as the part to do if the day
+   turns out longer than you thought. */
+const SESSION_MINUTE_CHOICES = [20, 30, 45, 60, 75, 90];
+const SESSION_MINUTES_DEFAULT = 30;
+
+function fitToMinutes(day, minutes) {
+  const all = day.items || [];
+  if (!minutes || minutes <= 0) {
+    return { core: all.slice(), extra: [], minutes: sessionMinutes(day) };
+  }
+  /* The session length shown everywhere is rounded, so a day that really
+     takes 63.4 minutes is displayed as 63. Without this, answering with
+     that same 63 would drop the last exercise for being 0.4 minutes too
+     long — and the button that offers "I have the full 63 minutes" would
+     visibly fail to give you the full session. Meeting the rounded total
+     counts as having time for all of it. */
+  const total = sum(all.map(exerciseMinutes));
+  if (minutes >= Math.floor(total)) {
+    return { core: all.slice(), extra: [], minutes: Math.round(total) };
+  }
+  /* Even a very short answer gets a real session rather than one set of
+     one thing: below this floor the honest reply is "that is what a
+     20-minute session looks like", not an empty screen. */
+  const floor = Math.min(minItemsFor(minutes), all.length);
+  const core = [];
+  let used = 0;
+  for (let i = 0; i < all.length; i++) {
+    const cost = exerciseMinutes(all[i]);
+    if (i >= floor && used + cost > minutes) break;
+    core.push(all[i]);
+    used += cost;
+  }
+  return { core: core, extra: all.slice(core.length), minutes: Math.round(used) };
+}
+
 function scoreExercise(ex, slot, ctx) {
   let sc = 0;
   const primaryHit = slot.muscles.includes(ex.pri);
@@ -2549,7 +2634,11 @@ function syncAge() { CURRENT_AGE = (S.profile.age && isFinite(S.profile.age)) ? 
    settings() backfills whatever is missing with defaults the
    moment anything asks for it.
    ============================================================ */
-const SETTINGS_DEFAULTS = { restAdjust: 0, autoStartTimer: true, vibrate: true, wakeLock: false };
+const SETTINGS_DEFAULTS = {
+  restAdjust: 0, autoStartTimer: true, vibrate: true, wakeLock: false,
+  /* what the "how long have you got" question opens on */
+  defaultSessionMinutes: SESSION_MINUTES_DEFAULT
+};
 function settings() {
   S.settings = Object.assign({}, SETTINGS_DEFAULTS, S.settings || {});
   return S.settings;
@@ -2691,6 +2780,18 @@ function paintPersonalize() {
     ),
     restExample
   ));
+
+  const minsSeg = h('div', { class: 'gate__choices gate__choices--tight' });
+  SESSION_MINUTE_CHOICES.forEach(m => {
+    minsSeg.appendChild(h('button', {
+      class: 'gate__chip', type: 'button',
+      'aria-pressed': (st.defaultSessionMinutes === m) ? 'true' : 'false',
+      onclick: () => { settings().defaultSessionMinutes = m; persist(); paintPersonalize(); }
+    }, String(m)));
+  });
+  panel.appendChild(pzRow('Time the session asks for first',
+    'Every workout starts by asking how long you have. This is the answer it opens on — in minutes.',
+    minsSeg));
 
   panel.appendChild(pzRow('Start my rest timer automatically', 'Off means ticking a set no longer starts the countdown for you — start it yourself when you are ready.',
     pzSwitch(st.autoStartTimer, () => { settings().autoStartTimer = !st.autoStartTimer; persist(); paintPersonalize(); })));
@@ -3374,6 +3475,31 @@ function getLog(dayIdx) {
   if (!S.log[dayIdx]) S.log[dayIdx] = { done: false, at: null, entries: {} };
   return S.log[dayIdx];
 }
+/* The time budget for one session, or null when it has not been asked
+   for yet. Kept on the log rather than in settings because it is an
+   answer about today, not a preference — a new week asks again. */
+function sessionBudget(dayIdx) {
+  const m = getLog(dayIdx).minutes;
+  return (typeof m === 'number' && m > 0) ? m : null;
+}
+/* Has any set been ticked? A session already under way is not
+   interrupted to ask how long it is going to take. */
+function dayStarted(day) {
+  return day.items.some(it => getEntry(day.idx, it).some(e => e.done));
+}
+
+/* Ticking a set deliberately does not re-render the view — that is what
+   keeps the tap instant and stops the screen replaying its entrance. The
+   cost is that anything outside the card which depends on "has anything
+   been logged yet" has to be told. Only the Finish button does. */
+function refreshFinishState(day) {
+  const btn = document.getElementById('finishBtn');
+  if (!btn) return;
+  const ready = dayStarted(day);
+  btn.disabled = !ready;
+  const note = document.getElementById('finishNote');
+  if (note) note.classList.toggle('u-hide', ready);
+}
 function getEntry(dayIdx, item) {
   const log = getLog(dayIdx);
   if (!log.entries[item.exId] || log.entries[item.exId].length !== item.sets) {
@@ -3741,15 +3867,19 @@ function viewHome() {
   const heroBody = h('div', { class: 'hero-panel__body' });
 
   if (scheduled && !doneToday) {
-    const totalSets = sum(scheduled.items.map(i => i.sets));
-    const doneSets = sum(scheduled.items.map(i => getEntry(scheduled.idx, i).filter(e => e.done).length));
+    /* once a length has been agreed for today, every number here is about
+       that session rather than the one the plan drew up */
+    const heroBudget = sessionBudget(scheduled.idx);
+    const heroFit = fitToMinutes(scheduled, heroBudget);
+    const totalSets = sum(heroFit.core.map(i => i.sets));
+    const doneSets = sum(heroFit.core.map(i => getEntry(scheduled.idx, i).filter(e => e.done).length));
     const started = doneSets > 0;
     heroBody.appendChild(h('p', { class: 'u-eyebrow', text: (started ? 'In progress · ' : 'Today · ') + DOW[scheduled.dow] }));
     heroBody.appendChild(h('h2', { class: 'hero-panel__title', text: scheduled.label }));
     heroBody.appendChild(h('div', { class: 'session__stats hero-panel__stats' },
-      stat('Exercises', String(scheduled.items.length)),
+      stat('Exercises', String(heroFit.core.length)),
       stat('Sets', doneSets + '/' + totalSets),
-      stat('Time', '~' + sessionMinutes(scheduled) + ' min')
+      stat(heroBudget ? 'You said' : 'Time', heroBudget ? heroBudget + ' min' : '~' + sessionMinutes(scheduled) + ' min')
     ));
     heroBody.appendChild(h('button', {
       class: 'btn btn--primary btn--lg',
@@ -3905,11 +4035,29 @@ function viewToday() {
   const day = dayById(idx);
   const log = getLog(day.idx);
   const isToday = day.dow === todayDow();
-  const totalSets = sum(day.items.map(i => i.sets));
-  const doneSets = sum(day.items.map(i => getEntry(day.idx, i).filter(e => e.done).length));
   const kicker = isToday ? 'Today · ' + DOW[day.dow]
     : scheduled ? 'Next up · ' + DOW[day.dow]
     : 'Extra session · ' + DOW[day.dow];
+
+  /* Ask before anything else: an untouched, unfinished session gets the
+     question, and nothing of the workout is shown until it is answered.
+     A session already under way, or already logged, is left alone. */
+  if (!log.done && sessionBudget(day.idx) == null && !dayStarted(day)) {
+    main.appendChild(h('header', { class: 'session__head' },
+      h('div', null,
+        h('p', { class: 'u-eyebrow', text: kicker }),
+        h('h1', { class: 'u-h2', text: day.label })
+      )
+    ));
+    main.appendChild(timeGate(day));
+    wrap.appendChild(main);
+    return wrap;
+  }
+
+  const budget = sessionBudget(day.idx);
+  const fit = fitToMinutes(day, budget);
+  const totalSets = sum(fit.core.map(i => i.sets));
+  const doneSets = sum(fit.core.map(i => getEntry(day.idx, i).filter(e => e.done).length));
 
   main.appendChild(h('header', { class: 'session__head' },
     h('div', { class: 'row', style: { gap: 'var(--s4)', flexWrap: 'nowrap' } },
@@ -3920,9 +4068,20 @@ function viewToday() {
       )
     ),
     h('div', { class: 'session__stats' },
-      stat('Exercises', String(day.items.length)),
+      stat('Exercises', String(fit.core.length)),
       stat('Sets', doneSets + '/' + totalSets),
-      stat('Time', '~' + sessionMinutes(day) + ' min')
+      budget
+        ? h('div', null,
+            h('span', { class: 'stat__label', text: 'You said' }),
+            h('span', { class: 'stat__val' },
+              budget + ' min',
+              h('button', {
+                class: 'btn btn--sm btn--ghost stat__change',
+                onclick: () => { log.minutes = null; persist(); lastViewKey = ''; render(); }
+              }, 'Change')
+            )
+          )
+        : stat('Time', '~' + sessionMinutes(day) + ' min')
     )
   ));
 
@@ -3937,17 +4096,43 @@ function viewToday() {
         '. Your weights carry over to next week as the starting point.')));
   }
 
-  day.items.forEach((item, i) => main.appendChild(stagger(exerciseCard(day, item, i), i, 55)));
+  fit.core.forEach((item, i) => main.appendChild(stagger(exerciseCard(day, item, i), i, 55)));
 
-  const anyLogged = day.items.some(it => getEntry(day.idx, it).some(e => e.done));
+  /* What did not fit is still here and still loggable. Hiding it would
+     mean the app quietly decided you were not going to do it. */
+  if (fit.extra.length) {
+    main.appendChild(h('div', { class: 'extras__head' },
+      h('div', null,
+        h('p', { class: 'u-eyebrow', text: 'If you have time' }),
+        h('p', { class: 'u-note', style: { marginTop: '2px' } },
+          fit.extra.length === 1
+            ? 'One more exercise, outside the ' + budget + ' minutes you said you had.'
+            : fit.extra.length + ' more exercises, outside the ' + budget + ' minutes you said you had.')
+      ),
+      h('button', {
+        class: 'btn btn--sm',
+        onclick: () => { log.minutes = sessionMinutes(day); persist(); lastViewKey = ''; render(); }
+      }, 'Do the full session')
+    ));
+    fit.extra.forEach((item, i) => {
+      const card = exerciseCard(day, item, fit.core.length + i);
+      card.classList.add('ex--extra');
+      main.appendChild(stagger(card, i, 55));
+    });
+  }
+
+  const anyLogged = dayStarted(day);
   main.appendChild(h('div', { class: 'actions' },
     log.done
       ? h('button', { class: 'btn', onclick: () => { log.done = false; persist(); render(); } }, 'Reopen session')
-      : h('button', { class: 'btn btn--primary', disabled: !anyLogged, onclick: () => finishSession(day) }, 'Finish session'),
+      : h('button', { id: 'finishBtn', class: 'btn btn--primary', disabled: !anyLogged, onclick: () => finishSession(day) }, 'Finish session'),
     h('button', { class: 'btn btn--ghost', onclick: () => { hubTab = 'week'; render(); } }, 'See the whole week')
   ));
-  if (!anyLogged && !log.done) {
-    main.appendChild(h('p', { class: 'u-note', style: { marginTop: 'var(--s3)' } }, 'Tick at least one set to finish the session.'));
+  if (!log.done) {
+    main.appendChild(h('p', {
+      id: 'finishNote', class: 'u-note' + (anyLogged ? ' u-hide' : ''),
+      style: { marginTop: 'var(--s3)' }
+    }, 'Tick at least one set to finish the session.'));
   }
 
   wrap.appendChild(main);
@@ -3959,6 +4144,65 @@ function stat(label, val) {
     h('span', { class: 'stat__label', text: label }),
     h('span', { class: 'stat__val', text: val })
   );
+}
+
+/* The question asked at the top of every session: how long have you got.
+   It answers itself as you pick — how many exercises that is, and which
+   lift you would finish on — because "45 minutes" means nothing until
+   you can see what it buys. */
+function timeGate(day) {
+  const full = sessionMinutes(day);
+  let picked = settings().defaultSessionMinutes || SESSION_MINUTES_DEFAULT;
+
+  const card = h('section', { class: 'card gate' });
+  card.appendChild(h('p', { class: 'u-eyebrow', text: 'Before you start' }));
+  card.appendChild(h('h2', { class: 'u-h2 gate__title', text: 'How long have you got?' }));
+  card.appendChild(h('p', { class: 'u-lede gate__lede' },
+    'The whole session is about ' + full + ' minutes. Say what you actually have and Anvil keeps the lifts that matter most.'));
+
+  const summary = h('p', { class: 'gate__summary' });
+  const chips = h('div', { class: 'gate__choices' });
+
+  function paint() {
+    Array.prototype.forEach.call(chips.children, btn => {
+      btn.setAttribute('aria-pressed', Number(btn.dataset.min) === picked ? 'true' : 'false');
+    });
+    const fit = fitToMinutes(day, picked);
+    const sets = sum(fit.core.map(i => i.sets));
+    summary.textContent = fit.extra.length === 0
+      ? 'That is the whole session — all ' + fit.core.length + ' exercises, ' + sets + ' sets.'
+      : fit.core.length + ' exercises, ' + sets + ' sets, finishing on ' + fit.core[fit.core.length - 1].name + '.';
+  }
+
+  SESSION_MINUTE_CHOICES.forEach(m => {
+    const btn = h('button', {
+      class: 'gate__chip', type: 'button', 'aria-pressed': 'false',
+      onclick: () => { picked = m; paint(); }
+    }, m + ' min');
+    btn.dataset.min = String(m);
+    chips.appendChild(btn);
+  });
+  card.appendChild(chips);
+  card.appendChild(summary);
+  paint();
+
+  card.appendChild(h('div', { class: 'actions gate__actions' },
+    h('button', {
+      class: 'btn btn--primary btn--lg',
+      onclick: () => {
+        getLog(day.idx).minutes = picked;
+        persist();
+        lastViewKey = '';
+        render();
+      }
+    }, 'Start training', h('span', { class: 'btn__arrow' }, '→')),
+    h('button', {
+      class: 'btn btn--ghost',
+      onclick: () => { getLog(day.idx).minutes = full; persist(); lastViewKey = ''; render(); }
+    }, 'I have the full ' + full + ' minutes')
+  ));
+
+  return card;
 }
 
 function weekRail(activeIdx) {
@@ -4073,6 +4317,7 @@ function exerciseCard(day, item, i) {
         row.classList.toggle('is-done', e.done);
         ok.setAttribute('aria-pressed', e.done ? 'true' : 'false');
         card.classList.toggle('is-done', entry.every(x => x.done));
+        refreshFinishState(day);
         if (e.done) { pulse(ok, 'is-pop'); pulse(row, 'is-flash'); }
       }
     }, s('svg', { viewBox: '0 0 16 16', width: 14, height: 14, 'aria-hidden': 'true' },
@@ -4186,6 +4431,7 @@ function finishSession(day) {
   day.items.forEach(it => { entries[it.exId] = getEntry(day.idx, it).map(e => ({ w: e.w, r: e.r, done: e.done })); });
   S.history.push({
     date: todayISO(), week: S.week, dayIdx: day.idx, name: day.label,
+    minutes: log.minutes || null,
     entries: entries,
     sets: sum(day.items.map(it => getEntry(day.idx, it).filter(e => e.done).length)),
     tonnage: Math.round(sum(day.items.flatMap(it => {
@@ -4326,6 +4572,9 @@ function startNewWeek() {
     });
     log.done = false;
     log.at = null;
+    /* a new week asks how long you have again: last week's Tuesday says
+       nothing about this week's */
+    log.minutes = null;
     Object.keys(log.entries).forEach(exId => log.entries[exId].forEach(e => { e.done = false; e.r = null; }));
   });
   S.week++;
@@ -5305,6 +5554,80 @@ function runSelfTests() {
     if (labels.length < 4 || labels.length > 6) return 'got ' + labels.length + ' labels: ' + labels.join(',');
     for (let i = 1; i < labels.length; i++) if (labels[i] === labels[i - 1]) return 'repeated ' + labels[i];
     return true;
+  });
+  /* ---------- how long have you got ---------- */
+  t('the session question opens on 30 minutes', () => {
+    return SETTINGS_DEFAULTS.defaultSessionMinutes === SESSION_MINUTES_DEFAULT &&
+      SESSION_MINUTES_DEFAULT === 30 || 'default is ' + SESSION_MINUTES_DEFAULT;
+  });
+  t('30 minutes is one of the offered answers', () => {
+    return SESSION_MINUTE_CHOICES.indexOf(SESSION_MINUTES_DEFAULT) >= 0 || SESSION_MINUTE_CHOICES.join(',');
+  });
+  t('a shorter answer never gives you more work than a longer one', () => {
+    const day = S.plan.days[0];
+    let prev = -1;
+    for (const m of SESSION_MINUTE_CHOICES) {
+      const n = fitToMinutes(day, m).core.length;
+      if (n < prev) return m + ' min gave ' + n + ' exercises, less than the answer below it';
+      prev = n;
+    }
+    return true;
+  });
+  t('what fits is the front of the plan, not a selection out of it', () => {
+    const day = S.plan.days[0];
+    const fit = fitToMinutes(day, 30);
+    for (let i = 0; i < fit.core.length; i++) {
+      if (fit.core[i] !== day.items[i]) return 'exercise ' + (i + 1) + ' is not the one the plan put there';
+    }
+    return true;
+  });
+  t('nothing is lost: what fits plus what does not is the whole day', () => {
+    const day = S.plan.days[0];
+    for (const m of [20, 30, 45, 90]) {
+      const fit = fitToMinutes(day, m);
+      if (fit.core.length + fit.extra.length !== day.items.length) {
+        return m + ' min accounted for ' + (fit.core.length + fit.extra.length) + ' of ' + day.items.length;
+      }
+      const seen = fit.core.concat(fit.extra);
+      for (let i = 0; i < day.items.length; i++) if (seen[i] !== day.items[i]) return m + ' min reordered the day';
+    }
+    return true;
+  });
+  t('even the shortest answer still gives a real session', () => {
+    const day = S.plan.days[0];
+    const fit = fitToMinutes(day, SESSION_MINUTE_CHOICES[0]);
+    const floor = Math.min(minItemsFor(SESSION_MINUTE_CHOICES[0]), day.items.length);
+    return fit.core.length >= floor || 'got ' + fit.core.length + ', floor is ' + floor;
+  });
+  t('asking for the length the app itself quotes gives the whole session', () => {
+    /* the quoted length is rounded, so this is the case where a fraction
+       of a minute could silently drop the last exercise */
+    for (const day of S.plan.days) {
+      const quoted = sessionMinutes(day);
+      const fit = fitToMinutes(day, quoted);
+      if (fit.extra.length) {
+        return day.label + ' quotes ' + quoted + ' min but held back ' + fit.extra.length;
+      }
+    }
+    return true;
+  });
+  t('no answer at all means the whole session, unchanged', () => {
+    const day = S.plan.days[0];
+    const fit = fitToMinutes(day, null);
+    return (fit.core.length === day.items.length && fit.extra.length === 0) ||
+      'got ' + fit.core.length + '/' + fit.extra.length;
+  });
+  t('the question is asked again the week after it was answered', () => {
+    const day = S.plan.days[0];
+    const log = getLog(day.idx);
+    const before = log.minutes;
+    log.minutes = 45;
+    const wasAsked = sessionBudget(day.idx) === 45;
+    /* startNewWeek does the clearing; this checks the field it clears */
+    log.minutes = null;
+    const asksAgain = sessionBudget(day.idx) === null;
+    log.minutes = before;
+    return (wasAsked && asksAgain) || 'budget did not reset';
   });
   t('every month index maps to a name', () => {
     if (MONTH_SHORT.length !== 12) return 'got ' + MONTH_SHORT.length;
