@@ -647,6 +647,12 @@ button.chip:active{transform:scale(.94)}
 .ex--extra{border-style:dashed;box-shadow:none;background:transparent}
 .ex--extra:hover{background:var(--surface)}
 
+/* "show me what this looks like" */
+.ex__see{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin:0 0 var(--s4)}
+.ex__see-label{font-size:.8125rem;color:var(--dim);margin-right:2px}
+.ex__see-out{opacity:.6;font-size:.75rem}
+a.btn{text-decoration:none}
+
 .restrow{
   display:flex;align-items:center;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;
   margin:0 0 var(--s4);
@@ -750,7 +756,9 @@ button.chip:active{transform:scale(.94)}
 @keyframes timer-in{from{opacity:0;transform:translateY(20px) scale(.94)}to{opacity:1;transform:none}}
 .timer__ring{width:36px;height:36px;flex:none;transform:rotate(-90deg)}
 .timer__track{stroke:var(--line-hi);fill:none;stroke-width:3}
-.timer__arc{stroke:var(--accent);fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .35s linear}
+/* matches the tick rate, so the ring glides between updates instead of
+   lagging a third of a second behind the number next to it */
+.timer__arc{stroke:var(--accent);fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .2s linear}
 .timer__val{display:block;font-size:1.25rem;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.02em;min-width:56px}
 .timer__label{font-size:.625rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);display:block}
 /* when the rest is up the whole widget breathes, so you can catch it
@@ -3041,6 +3049,29 @@ function confirmButton(label, confirmLabel, cls, onYes) {
   return btn;
 }
 
+/* ============================================================
+   SEEING THE MOVEMENT
+
+   Written instructions get you most of the way, but "keep your elbows
+   under the bar rather than flared" only means something once you have
+   watched somebody do it.
+
+   Anvil ships no footage of its own. A hundred and twenty clips do not
+   fit in a single offline HTML file, and drawn figures are exactly what
+   got deleted from this app for showing a different movement from the
+   one named above them. So these hand the question to somewhere that
+   has real footage of the real lift, searched by the exercise's own
+   name. Both open in a new tab and both need a connection — the only
+   part of Anvil that does.
+   ============================================================ */
+function demoQuery(name) { return name + ' exercise proper form'; }
+function videoSearchURL(name) {
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(demoQuery(name));
+}
+function imageSearchURL(name) {
+  return 'https://duckduckgo.com/?iax=images&ia=images&q=' + encodeURIComponent(demoQuery(name));
+}
+
 /* a circular completion meter, used on the session head.
    On arrival the arc sweeps up from empty rather than appearing already
    full — the sweep is the only thing on screen that shows the number
@@ -3576,55 +3607,119 @@ function beep() {
   } catch (e) { /* sound is optional */ }
 }
 
+/* How much is left, from a deadline rather than a counter.
+
+   Counting down by one on every setInterval tick assumes each tick
+   arrives exactly 1000ms apart, and none of them do: the callback was
+   also rebuilding the whole widget, browsers throttle timers in
+   background tabs, and a phone that locks mid-rest stops delivering them
+   at all. The drift is one-directional, so the clock always ran slow —
+   about a second and a bit per displayed second. Reading a fixed
+   deadline instead cannot drift, and a screen that wakes up two minutes
+   later shows the truth rather than being two minutes behind it. */
+function secondsLeft(endsAt, now) {
+  return Math.ceil((endsAt - now) / 1000);
+}
+function timerLeft() {
+  return timer ? secondsLeft(timer.endsAt, Date.now()) : 0;
+}
+
+/* Faster than once a second, so the displayed number changes within a
+   fifth of a second of the moment it actually should. */
+const TIMER_TICK_MS = 200;
+
 function startTimer(seconds, label) {
   stopTimer();
-  timer = { left: seconds, total: seconds, label: label || 'Rest', up: false };
+  timer = {
+    total: seconds,
+    endsAt: Date.now() + seconds * 1000,
+    label: label || 'Rest',
+    up: false,
+    el: null
+  };
   const id = setInterval(() => {
     /* if this tick is no longer the live timer, it is an orphan: stop it
        rather than throwing on a null once a second forever */
     if (!timer || timer.id !== id) { clearInterval(id); return; }
-    timer.left--;
-    if (timer.left <= 0 && !timer.up) {
-      timer.up = true; timer.left = 0;
-      beep(); vibrateAlert();
-      announce('Rest is up. ' + timer.label);
-    }
-    if (timer.left <= -30) { stopTimer(); return; }
-    paintTimer();
-  }, 1000);
+    tickTimer();
+  }, TIMER_TICK_MS);
   timer.id = id;
   paintTimer();
 }
+
+function tickTimer() {
+  if (!timer) return;
+  const left = timerLeft();
+  if (left <= 0 && !timer.up) {
+    timer.up = true;
+    beep(); vibrateAlert();
+    announce('Rest is up. ' + timer.label);
+  }
+  if (left <= -30) { stopTimer(); return; }
+  updateTimer();
+}
+
 function stopTimer() { if (timer && timer.id) clearInterval(timer.id); timer = null; paintTimer(); }
 
+/* Builds the widget. Called when the timer starts, stops, or the sound
+   button relabels itself — never on a tick. Rebuilding it every second
+   was what made it flash back into view over and over: a brand new
+   element starts its entrance animation from the beginning, so what
+   looked like a popup reappearing was the same widget being thrown away
+   and replaced sixty times a minute. */
 function paintTimer() {
   const mount = $('#timerMount');
   if (!mount) return;
   mount.textContent = '';
   if (!timer) return;
   const R = 15, C = 2 * Math.PI * R;
-  const frac = clamp(timer.left / timer.total, 0, 1);
-  const mins = Math.floor(Math.abs(timer.left) / 60), secs = Math.abs(timer.left) % 60;
+
+  const arc = s('circle', { class: 'timer__arc', cx: 18, cy: 18, r: R, 'stroke-dasharray': C, 'stroke-dashoffset': 0 });
   const sv = s('svg', { class: 'timer__ring', viewBox: '0 0 36 36', 'aria-hidden': 'true' });
   sv.appendChild(s('circle', { class: 'timer__track', cx: 18, cy: 18, r: R }));
-  sv.appendChild(s('circle', { class: 'timer__arc', cx: 18, cy: 18, r: R, 'stroke-dasharray': C, 'stroke-dashoffset': C * (1 - frac) }));
+  sv.appendChild(arc);
 
-  /* Not a live region: this element is rebuilt every second, and a live
-     region here would have a screen reader read the countdown out one
-     tick at a time. The one thing worth announcing — that the rest is
-     over — is announced once, from startTimer, through #live. */
-  mount.appendChild(h('div', { class: 'timer' + (timer.up ? ' is-up' : ''), role: 'timer', 'aria-label': (timer.up ? 'Rest is up' : timer.label) },
+  /* Not a live region: the numbers change several times a second, and a
+     live region here would have a screen reader read the countdown out
+     tick by tick. That the rest is over is announced once, through
+     #live, from tickTimer. */
+  const labelEl = h('span', { class: 'timer__label' });
+  const valEl = h('span', { class: 'timer__val' });
+  const root = h('div', { class: 'timer', role: 'timer' },
     sv,
-    h('div', null,
-      h('span', { class: 'timer__label', text: timer.up ? 'Time is up' : timer.label }),
-      h('span', { class: 'timer__val', text: (timer.left < 0 ? '+' : '') + mins + ':' + String(secs).padStart(2, '0') })
-    ),
+    h('div', null, labelEl, valEl),
     h('button', { class: 'btn btn--sm', onclick: stopTimer }, 'Done'),
     h('button', {
       class: 'btn btn--sm btn--ghost',
       onclick: () => { S.mute = !S.mute; persist(); paintTimer(); }
     }, S.mute ? 'Sound off' : 'Sound on')
-  ));
+  );
+
+  timer.el = { root: root, arc: arc, label: labelEl, val: valEl, circ: C };
+  mount.appendChild(root);
+  updateTimer();
+}
+
+/* Writes the current numbers into the widget already on screen. Creates
+   and removes nothing, so no animation restarts and nothing moves. */
+function updateTimer() {
+  if (!timer || !timer.el) return;
+  const el = timer.el;
+  const left = timerLeft();
+  const mins = Math.floor(Math.abs(left) / 60), secs = Math.abs(left) % 60;
+  const text = (left < 0 ? '+' : '') + mins + ':' + String(secs).padStart(2, '0');
+  if (el.val.textContent !== text) el.val.textContent = text;
+
+  const label = timer.up ? 'Time is up' : timer.label;
+  if (el.label.textContent !== label) el.label.textContent = label;
+
+  /* the ring uses the exact remaining fraction rather than the rounded
+     second, so it sweeps rather than stepping four times a second */
+  const exact = clamp((timer.endsAt - Date.now()) / (timer.total * 1000), 0, 1);
+  el.arc.setAttribute('stroke-dashoffset', String(el.circ * (1 - exact)));
+
+  el.root.classList.toggle('is-up', timer.up);
+  el.root.setAttribute('aria-label', timer.up ? 'Rest is up' : timer.label);
 }
 
 /* ============================================================
@@ -4265,6 +4360,22 @@ function exerciseCard(day, item, i) {
 
   const body = h('div', { class: 'ex__body' });
   body.appendChild(h('ol', { class: 'ex__steps' }, item.steps.map(st => h('li', null, st))));
+
+  /* for when the words are not enough, which is most of them the first
+     time you meet a lift */
+  body.appendChild(h('div', { class: 'ex__see' },
+    h('span', { class: 'ex__see-label', text: 'Not sure how it looks?' }),
+    h('a', {
+      class: 'btn btn--sm', href: videoSearchURL(item.name),
+      target: '_blank', rel: 'noopener noreferrer',
+      'aria-label': 'Watch a video of ' + item.name + ', opens in a new tab'
+    }, 'Watch a video', h('span', { class: 'ex__see-out', 'aria-hidden': 'true' }, '↗')),
+    h('a', {
+      class: 'btn btn--sm', href: imageSearchURL(item.name),
+      target: '_blank', rel: 'noopener noreferrer',
+      'aria-label': 'See photos of ' + item.name + ', opens in a new tab'
+    }, 'See photos', h('span', { class: 'ex__see-out', 'aria-hidden': 'true' }, '↗'))
+  ));
 
   body.appendChild(h('div', { class: 'restrow' },
     h('span', { class: 'restrow__label', text: 'Rest ' + fmtRest(effectiveRest(item.rest)) + ' between sets' }),
@@ -5555,6 +5666,47 @@ function runSelfTests() {
     for (let i = 1; i < labels.length; i++) if (labels[i] === labels[i - 1]) return 'repeated ' + labels[i];
     return true;
   });
+  /* ---------- the rest timer ---------- */
+  t('the countdown is read from a deadline, so it cannot drift', () => {
+    const t0 = 1_700_000_000_000;
+    const cases = [[t0 + 60000, t0, 60], [t0 + 1000, t0, 1], [t0 + 1, t0, 1], [t0, t0, 0]];
+    for (const [endsAt, now, want] of cases) {
+      const got = secondsLeft(endsAt, now);
+      if (got !== want) return 'at ' + (endsAt - now) + 'ms out it said ' + got + ', not ' + want;
+    }
+    return true;
+  });
+  t('a timer left running past zero counts up, it does not stall', () => {
+    const t0 = 1_700_000_000_000;
+    return (secondsLeft(t0 - 1500, t0) === -1 && secondsLeft(t0 - 20000, t0) === -20) ||
+      'got ' + secondsLeft(t0 - 1500, t0) + ' and ' + secondsLeft(t0 - 20000, t0);
+  });
+  t('a screen asleep for two minutes wakes to the truth, not to where it paused', () => {
+    /* the whole point of a deadline: no ticks arrive while the phone is
+       locked, and the answer is still right when it comes back */
+    const t0 = 1_700_000_000_000;
+    const endsAt = t0 + 90 * 1000;
+    return secondsLeft(endsAt, t0 + 120 * 1000) === -30 || 'got ' + secondsLeft(endsAt, t0 + 120 * 1000);
+  });
+  t('the timer ticks faster than the second it displays', () => {
+    return TIMER_TICK_MS < 1000 || 'tick is ' + TIMER_TICK_MS + 'ms';
+  });
+
+  /* ---------- seeing the movement ---------- */
+  t('every exercise can be looked up by name, and the name survives the URL', () => {
+    for (const ex of LIB) {
+      const v = videoSearchURL(ex.name), i = imageSearchURL(ex.name);
+      if (v.slice(0, 8) !== 'https://' || i.slice(0, 8) !== 'https://') return ex.id + ' produced a non-https link';
+      if (/[ "<>]/.test(v) || /[ "<>]/.test(i)) return ex.id + ' left an unescaped character in the query';
+      if (v.indexOf(encodeURIComponent(ex.name).slice(0, 12)) === -1) return ex.id + ' lost its name from the query';
+    }
+    return true;
+  });
+  t('an exercise with a plus or an ampersand in its name still searches for itself', () => {
+    const url = videoSearchURL('Weighted dip + belt & chain');
+    return (url.indexOf('%2B') !== -1 && url.indexOf('%26') !== -1) || url;
+  });
+
   /* ---------- how long have you got ---------- */
   t('the session question opens on 30 minutes', () => {
     return SETTINGS_DEFAULTS.defaultSessionMinutes === SESSION_MINUTES_DEFAULT &&
@@ -5827,7 +5979,12 @@ window.addEventListener('error', e => {
      hidden, so pick it back up when the setting is on and the tab
      becomes visible again */
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && settings().wakeLock && !wakeLockSentinel) requestWakeLock();
+    if (document.visibilityState !== 'visible') return;
+    if (settings().wakeLock && !wakeLockSentinel) requestWakeLock();
+    /* Timers are throttled or stopped outright while the tab is hidden,
+       so a rest that ended with the phone in a pocket has not fired yet.
+       Catch up the moment the screen comes back. */
+    tickTimer();
   });
   if (settings().wakeLock) requestWakeLock();
 
