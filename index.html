@@ -647,6 +647,49 @@ button.chip:active{transform:scale(.94)}
 .ex--extra{border-style:dashed;box-shadow:none;background:transparent}
 .ex--extra:hover{background:var(--surface)}
 
+/* ---- the cool-down ---- */
+.stretch{
+  margin-top:var(--s6);
+  background:linear-gradient(150deg,rgba(63,214,140,.08),transparent 62%),var(--surface);
+  border-color:rgba(63,214,140,.28);
+}
+.stretch__head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s4);flex-wrap:wrap}
+.stretch__name{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin-top:var(--s1)}
+.stretch__side{flex:none}
+.stretch__clock{
+  font-size:2rem;font-weight:700;letter-spacing:-.03em;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--good);flex:none;
+}
+.stretch__tick{font-size:1.5rem;color:var(--good);line-height:1;flex:none}
+.stretch__lede{margin:var(--s3) 0 var(--s4)}
+.stretch__track{
+  height:5px;border-radius:var(--r-pill);background:var(--bg-2);
+  border:1px solid var(--line);overflow:hidden;margin:var(--s4) 0;
+}
+.stretch__track i{
+  display:block;height:100%;width:0;border-radius:inherit;
+  background:linear-gradient(90deg,var(--good),#7BE8B4);
+  transition:width .2s linear;
+}
+.stretch__steps{border-left-color:rgba(63,214,140,.4);margin-bottom:var(--s4)}
+.stretch__steps li::before{color:var(--good)}
+.stretch__list{
+  list-style:none;counter-reset:stretch;padding:0;
+  margin:0 0 var(--s5);border-top:1px solid var(--line);
+}
+.stretch__list li{
+  counter-increment:stretch;
+  display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);
+  padding:10px 0;border-bottom:1px solid var(--line);font-size:.9375rem;
+}
+.stretch__list li::before{
+  content:counter(stretch);flex:none;width:1.4em;
+  font-size:.6875rem;font-weight:700;color:var(--good);
+}
+.stretch__item-name{flex:1;min-width:0}
+.stretch__item-time{flex:none;font-size:.8125rem;color:var(--dim);font-variant-numeric:tabular-nums}
+.stretch__actions{margin-top:var(--s4)}
+
 /* "show me what this looks like" */
 .ex__see{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin:0 0 var(--s4)}
 .ex__see-label{font-size:.8125rem;color:var(--dim);margin-right:2px}
@@ -1418,6 +1461,108 @@ const LIB = [
 ];
 
 /* ============================================================
+   DATA: cool-down stretches
+
+   Tagged by the muscles they actually lengthen, so the block at the end
+   of a session can be built from what that session loaded rather than
+   being the same four stretches after every workout. A leg day has no
+   business finishing with a doorway chest stretch.
+
+   hold  seconds to stay in the position
+   uni   one side at a time, so it costs two holds
+   ============================================================ */
+const STRETCHES = [
+  { id: 'doorway_chest', name: 'Doorway chest stretch', muscles: ['chest', 'front_delts'], hold: 30, uni: false, steps: [
+    'Stand in a doorway and put your forearms on the frame, elbows a little below shoulder height.',
+    'Step one foot through the doorway.',
+    'Lean your weight gently forward until you feel a stretch across the front of your chest.',
+    'Keep your ribs down and breathe — do not arch your lower back to get further.'] },
+  /* drawing the arm across the body lengthens the side of the shoulder
+     as well as the back of it, which is why side_delts belongs here */
+  { id: 'cross_body_delt', name: 'Cross-body shoulder stretch', muscles: ['rear_delts', 'side_delts', 'upper_back'], hold: 30, uni: true, steps: [
+    'Bring one arm straight across your chest at shoulder height.',
+    'Hook your other forearm underneath it and draw it in towards you.',
+    'Keep the stretching shoulder down, not shrugged up towards your ear.'] },
+  { id: 'overhead_triceps', name: 'Overhead triceps stretch', muscles: ['triceps', 'lats'], hold: 30, uni: true, steps: [
+    'Reach one arm overhead and bend the elbow so your hand drops behind your neck.',
+    'Take hold of that elbow with your other hand.',
+    'Draw the elbow gently back and across until you feel it down the back of the arm.'] },
+  { id: 'childs_pose', name: "Child's pose", muscles: ['lats', 'upper_back'], hold: 40, uni: false, steps: [
+    'Kneel down and sit your hips back onto your heels.',
+    'Walk your hands forward along the floor and let your chest sink towards it.',
+    'Reach through your fingertips to lengthen your back and lats.',
+    'Rest your forehead on the floor and breathe into your ribs.'] },
+  { id: 'lat_hang', name: 'Hanging lat stretch', muscles: ['lats', 'upper_back'], hold: 30, uni: false, steps: [
+    'Take a shoulder-width grip on a bar and hang with your arms straight.',
+    'Let your shoulders rise up towards your ears and your body go heavy.',
+    'Keep your feet on the floor and take some weight through them if a full hang is too much.'] },
+  { id: 'wall_biceps', name: 'Wall biceps stretch', muscles: ['biceps', 'front_delts'], hold: 30, uni: true, steps: [
+    'Put one palm flat on a wall behind you at about shoulder height, arm straight, thumb pointing down.',
+    'Turn your body slowly away from that hand.',
+    'Stop as soon as you feel it in the front of the upper arm — this one does not need force.'] },
+  { id: 'thread_needle', name: 'Thread the needle', muscles: ['upper_back', 'rear_delts'], hold: 30, uni: true, steps: [
+    'Start on all fours, hands under shoulders and knees under hips.',
+    'Slide one arm underneath your body and across, palm up, until that shoulder rests on the floor.',
+    'Let your head rest down and keep your hips stacked over your knees.'] },
+  { id: 'neck_trap', name: 'Neck and upper trap stretch', muscles: ['upper_back'], hold: 25, uni: true, steps: [
+    'Sit or stand tall and let one arm hang heavy at your side.',
+    'Tilt your head away from that arm, bringing your ear towards the opposite shoulder.',
+    'Rest the opposite hand on your head for a little extra weight — do not pull.'] },
+  { id: 'standing_quad', name: 'Standing quad stretch', muscles: ['quads'], hold: 30, uni: true, steps: [
+    'Stand tall, holding something steady if you need the balance.',
+    'Bend one knee and take that ankle behind you.',
+    'Draw the heel towards your backside, keeping your knees side by side.',
+    'Tuck your hips under slightly and you will feel it much more.'] },
+  { id: 'kneeling_hip_flexor', name: 'Kneeling hip flexor stretch', muscles: ['quads', 'glutes'], hold: 40, uni: true, steps: [
+    'Kneel on one knee with the other foot flat on the floor in front of you.',
+    'Squeeze the glute on the kneeling side and tuck your hips under.',
+    'Shift your weight gently forward, staying tall through your chest.',
+    'Put something soft under the knee if the floor is hard.'] },
+  { id: 'seated_hamstring', name: 'Seated hamstring stretch', muscles: ['hamstrings'], hold: 30, uni: true, steps: [
+    'Sit down with one leg straight out and the other bent, foot tucked towards your inner thigh.',
+    'Hinge forward from the hips over the straight leg, not from your upper back.',
+    'Reach towards the foot with a flat back and stop where the stretch begins.'] },
+  { id: 'forward_fold', name: 'Standing forward fold', muscles: ['hamstrings', 'calves'], hold: 40, uni: false, steps: [
+    'Stand with your feet hip-width apart.',
+    'Hinge forward from the hips and let your upper body hang down.',
+    'Keep a soft bend in the knees — this is for the hamstrings, not your lower back.',
+    'Let your head and arms go heavy and breathe.'] },
+  { id: 'figure_four', name: 'Figure-four glute stretch', muscles: ['glutes'], hold: 30, uni: true, steps: [
+    'Lie on your back with both knees bent and feet flat.',
+    'Cross one ankle over the opposite thigh, just above the knee.',
+    'Reach through and pull the supporting thigh towards your chest.',
+    'Keep your head and shoulders relaxed on the floor.'] },
+  { id: 'deep_squat_hold', name: 'Deep squat hold', muscles: ['glutes', 'quads', 'calves'], hold: 40, uni: false, steps: [
+    'Stand with your feet a little wider than your shoulders, toes turned slightly out.',
+    'Sit all the way down into the bottom of a squat.',
+    'Put your elbows inside your knees and press them gently outwards.',
+    'Hold a doorframe in front of you if your heels lift or you cannot stay balanced.'] },
+  { id: 'wall_calf', name: 'Standing calf stretch', muscles: ['calves'], hold: 30, uni: true, steps: [
+    'Stand facing a wall with both hands on it at chest height.',
+    'Step one foot well back, keeping that leg straight and the heel pressed down.',
+    'Bend the front knee and lean in until you feel it down the back of the calf.'] },
+  { id: 'cobra_stretch', name: 'Cobra stretch', muscles: ['abs'], hold: 30, uni: false, steps: [
+    'Lie face down with your hands under your shoulders.',
+    'Press gently up, lifting your chest while your hips stay on the floor.',
+    'Keep your elbows slightly bent and your shoulders down away from your ears.',
+    'Come out of it straight away if you feel anything in your lower back.'] },
+  { id: 'side_bend', name: 'Standing side bend', muscles: ['abs', 'lats'], hold: 25, uni: true, steps: [
+    'Stand tall with your feet hip-width apart.',
+    'Reach one arm overhead and lean over to the opposite side.',
+    'Keep both feet planted and your hips facing forward rather than twisting.'] },
+  { id: 'behind_back_clasp', name: 'Behind-the-back clasp', muscles: ['front_delts', 'chest', 'biceps'], hold: 30, uni: false, steps: [
+    'Stand tall and clasp your hands together behind your back.',
+    'Straighten your arms and draw your shoulder blades together.',
+    'Lift your hands away from your body until you feel it across the front of your shoulders.',
+    'Hold a towel between your hands if you cannot link them comfortably.'] },
+  { id: 'shoulder_sweep', name: 'Overhead shoulder sweep', muscles: ['side_delts', 'lats'], hold: 30, uni: true, steps: [
+    'Stand side-on to a wall, close enough to touch it.',
+    'Raise the arm nearest the wall straight overhead and rest the palm flat against it.',
+    'Lean your hips gently away from the wall.',
+    'You should feel it down the outside of the shoulder and into the ribs.'] }
+];
+
+/* ============================================================
    DATA: session templates
    Each slot names candidate muscles and what kind of exercise fits.
    opt:true marks a slot the duration fitter is allowed to drop.
@@ -1866,6 +2011,84 @@ function sessionMinutes(session) {
    turns out longer than you thought. */
 const SESSION_MINUTE_CHOICES = [20, 30, 45, 60, 75, 90];
 const SESSION_MINUTES_DEFAULT = 30;
+
+/* ---- the cool-down ----
+
+   Which stretches, and how many of them fit in three to five minutes.
+
+   The stretches are chosen for the session that was actually done: every
+   muscle the day loaded is weighted by the sets that hit it, primaries
+   counting double what secondaries do, and stretches are taken greedily
+   by how much of that they cover. Once a muscle has been stretched it
+   stops counting, so the block spreads across the session rather than
+   giving you three different hamstring stretches.
+
+   If covering everything takes less than the floor — a short push day
+   only has so much to lengthen — a second pass tops it back up with the
+   next-best stretches for the same muscles, so the block is always worth
+   putting a timer on. */
+const STRETCH_TARGET_SECONDS = 240;
+const STRETCH_MIN_SECONDS = 180;
+const STRETCH_MAX_SECONDS = 300;
+/* getting down onto the floor and back up again is not free */
+const STRETCH_CHANGEOVER = 8;
+
+function stretchCost(st) { return (st.uni ? st.hold * 2 : st.hold) + STRETCH_CHANGEOVER; }
+
+function sessionLoad(items) {
+  const load = {};
+  (items || []).forEach(it => {
+    load[it.pri] = (load[it.pri] || 0) + it.sets;
+    (it.sec || []).forEach(m => { load[m] = (load[m] || 0) + it.sets * 0.5; });
+  });
+  return load;
+}
+
+function stretchesFor(items, seconds) {
+  const budget = clamp(seconds || STRETCH_TARGET_SECONDS, STRETCH_MIN_SECONDS, STRETCH_MAX_SECONDS);
+  const load = sessionLoad(items);
+  const left = Object.assign({}, load);
+  const picked = [];
+  let used = 0;
+
+  const take = scoreOf => {
+    for (;;) {
+      let best = null, bestScore = 0;
+      for (const st of STRETCHES) {
+        if (picked.indexOf(st) !== -1) continue;
+        if (used + stretchCost(st) > budget) continue;
+        const score = scoreOf(st);
+        if (score > bestScore) { bestScore = score; best = st; }
+      }
+      if (!best) return false;
+      picked.push(best);
+      used += stretchCost(best);
+      best.muscles.forEach(m => { if (left[m]) left[m] = 0; });
+      if (used >= STRETCH_MIN_SECONDS) return true;
+    }
+  };
+
+  /* first by what is still uncovered, then by what was trained at all */
+  take(st => sum(st.muscles.map(m => left[m] || 0)));
+  if (used < STRETCH_MIN_SECONDS) take(st => sum(st.muscles.map(m => load[m] || 0)));
+
+  return { list: picked, seconds: used, minutes: Math.max(1, Math.round(used / 60)) };
+}
+
+/* One stretch becomes two turns when it is done a side at a time, which
+   is what the guided run counts through. */
+function stretchPhases(list) {
+  const out = [];
+  (list || []).forEach(st => {
+    if (st.uni) {
+      out.push({ st: st, side: 'Left side' });
+      out.push({ st: st, side: 'Right side' });
+    } else {
+      out.push({ st: st, side: null });
+    }
+  });
+  return out;
+}
 
 function fitToMinutes(day, minutes) {
   const all = day.items || [];
@@ -2560,6 +2783,7 @@ let hubTab = 'home';
 let openDay = null;
 let timer = null;
 let trendEx = null;
+let stretchRun = null;
 let personalizeOpen = false;
 
 /* ---------- motion ----------
@@ -2645,7 +2869,9 @@ function syncAge() { CURRENT_AGE = (S.profile.age && isFinite(S.profile.age)) ? 
 const SETTINGS_DEFAULTS = {
   restAdjust: 0, autoStartTimer: true, vibrate: true, wakeLock: false,
   /* what the "how long have you got" question opens on */
-  defaultSessionMinutes: SESSION_MINUTES_DEFAULT
+  defaultSessionMinutes: SESSION_MINUTES_DEFAULT,
+  /* the cool-down block at the end of a session */
+  showStretch: true
 };
 function settings() {
   S.settings = Object.assign({}, SETTINGS_DEFAULTS, S.settings || {});
@@ -2800,6 +3026,9 @@ function paintPersonalize() {
   panel.appendChild(pzRow('Time the session asks for first',
     'Every workout starts by asking how long you have. This is the answer it opens on — in minutes.',
     minsSeg));
+
+  panel.appendChild(pzRow('Offer a cool-down', 'A three-to-five minute stretch at the end of each session, picked for the muscles that session worked. Off removes it entirely.',
+    pzSwitch(st.showStretch, () => { settings().showStretch = !st.showStretch; persist(); paintPersonalize(); render(); })));
 
   panel.appendChild(pzRow('Start my rest timer automatically', 'Off means ticking a set no longer starts the countdown for you — start it yourself when you are ready.',
     pzSwitch(st.autoStartTimer, () => { settings().autoStartTimer = !st.autoStartTimer; persist(); paintPersonalize(); })));
@@ -3047,6 +3276,87 @@ function confirmButton(label, confirmLabel, cls, onYes) {
     } else { onYes(); }
   });
   return btn;
+}
+
+/* ============================================================
+   THE COOL-DOWN
+
+   A guided run through the stretches, one at a time, so it is something
+   you follow rather than a list you read and skip.
+
+   Built the same way as the rest timer, for the same reasons: the
+   countdown comes off a deadline so it cannot drift, and the panel is
+   rebuilt only when the stretch changes — never on a tick.
+   ============================================================ */
+function stretchLeft() {
+  return stretchRun ? secondsLeft(stretchRun.endsAt, Date.now()) : 0;
+}
+
+function startStretchRun(dayIdx, list) {
+  stopStretchRun();
+  stopTimer();                       /* the sets are over */
+  const phases = stretchPhases(list);
+  if (!phases.length) return;
+  stretchRun = {
+    dayIdx: dayIdx, phases: phases, i: 0,
+    endsAt: Date.now() + phases[0].st.hold * 1000, id: null
+  };
+  const id = setInterval(() => {
+    if (!stretchRun || stretchRun.id !== id) { clearInterval(id); return; }
+    stretchTick();
+  }, TIMER_TICK_MS);
+  stretchRun.id = id;
+  paintStretch();
+}
+
+function stopStretchRun() {
+  if (stretchRun && stretchRun.id) clearInterval(stretchRun.id);
+  stretchRun = null;
+}
+
+function stretchTick() {
+  if (!stretchRun) return;
+  if (stretchLeft() <= 0) { advanceStretch(true); return; }
+  updateStretchClock();
+}
+
+function advanceStretch(auto) {
+  if (!stretchRun) return;
+  const next = stretchRun.i + 1;
+  if (next >= stretchRun.phases.length) { finishStretchRun(); return; }
+  stretchRun.i = next;
+  stretchRun.endsAt = Date.now() + stretchRun.phases[next].st.hold * 1000;
+  /* a nudge only when the clock moved you on, not when you tapped Next
+     yourself — you already know you did that */
+  if (auto) { beep(); vibrateAlert(); }
+  paintStretch();
+}
+
+function finishStretchRun() {
+  const dayIdx = stretchRun ? stretchRun.dayIdx : null;
+  stopStretchRun();
+  if (dayIdx != null) { getLog(dayIdx).stretched = true; persist(); }
+  beep(); vibrateAlert();
+  announce('Cool-down finished.');
+  paintStretch();
+}
+
+/* the number and the bar, and nothing else — this runs five times a
+   second */
+function updateStretchClock() {
+  if (!stretchRun) return;
+  const clock = document.getElementById('stretchClock');
+  if (clock) {
+    const left = Math.max(0, stretchLeft());
+    const text = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    if (clock.textContent !== text) clock.textContent = text;
+  }
+  const bar = document.getElementById('stretchBar');
+  if (bar) {
+    const ph = stretchRun.phases[stretchRun.i];
+    const within = clamp(1 - (stretchRun.endsAt - Date.now()) / (ph.st.hold * 1000), 0, 1);
+    bar.style.width = ((stretchRun.i + within) / stretchRun.phases.length * 100) + '%';
+  }
 }
 
 /* ============================================================
@@ -4216,6 +4526,9 @@ function viewToday() {
     });
   }
 
+  /* the last thing in the session, which is where a cool-down belongs */
+  if (settings().showStretch) main.appendChild(stretchCard(day));
+
   const anyLogged = dayStarted(day);
   main.appendChild(h('div', { class: 'actions' },
     log.done
@@ -4239,6 +4552,116 @@ function stat(label, val) {
     h('span', { class: 'stat__label', text: label }),
     h('span', { class: 'stat__val', text: val })
   );
+}
+
+/* Small link pair for showing what a movement looks like, shared by the
+   exercise cards and the cool-down. */
+function seeItRow(name, label) {
+  return h('div', { class: 'ex__see' },
+    h('span', { class: 'ex__see-label', text: label || 'Not sure how it looks?' }),
+    h('a', {
+      class: 'btn btn--sm', href: videoSearchURL(name), target: '_blank', rel: 'noopener noreferrer',
+      'aria-label': 'Watch a video of ' + name + ', opens in a new tab'
+    }, 'Watch a video', h('span', { class: 'ex__see-out', 'aria-hidden': 'true' }, '↗')),
+    h('a', {
+      class: 'btn btn--sm', href: imageSearchURL(name), target: '_blank', rel: 'noopener noreferrer',
+      'aria-label': 'See photos of ' + name + ', opens in a new tab'
+    }, 'See photos', h('span', { class: 'ex__see-out', 'aria-hidden': 'true' }, '↗'))
+  );
+}
+
+/* The cool-down card: an invitation, a guided run, or a done state. */
+function stretchInner(day) {
+  const log = getLog(day.idx);
+
+  if (stretchRun && stretchRun.dayIdx === day.idx) {
+    const ph = stretchRun.phases[stretchRun.i];
+    const left = Math.max(0, stretchLeft());
+    return [
+      h('div', { class: 'stretch__head' },
+        h('div', null,
+          h('p', { class: 'u-eyebrow', text: 'Cool-down · ' + (stretchRun.i + 1) + ' of ' + stretchRun.phases.length }),
+          h('h2', { class: 'u-h3 stretch__name' }, ph.st.name,
+            ph.side ? h('span', { class: 'tag tag--accent stretch__side', text: ph.side }) : null)
+        ),
+        h('span', { class: 'stretch__clock', id: 'stretchClock',
+          text: Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') })
+      ),
+      h('div', { class: 'stretch__track' }, h('i', { id: 'stretchBar' })),
+      h('ol', { class: 'ex__steps stretch__steps' }, ph.st.steps.map(x => h('li', null, x))),
+      seeItRow(ph.st.name, 'Not sure of the position?'),
+      h('div', { class: 'row stretch__actions' },
+        h('button', { class: 'btn btn--sm btn--primary', onclick: () => advanceStretch(false) },
+          stretchRun.i + 1 >= stretchRun.phases.length ? 'Finish' : 'Next'),
+        h('button', { class: 'btn btn--sm btn--ghost', onclick: () => { stopStretchRun(); paintStretch(); } }, 'Stop')
+      )
+    ];
+  }
+
+  const plan = stretchesFor(day.items);
+  if (!plan.list.length) return [h('p', { class: 'u-note', text: 'Nothing to stretch here.' })];
+
+  if (log.stretched) {
+    return [
+      h('div', { class: 'stretch__head' },
+        h('div', null,
+          h('p', { class: 'u-eyebrow', text: 'Cool-down' }),
+          h('h2', { class: 'u-h3', text: 'Stretched' })
+        ),
+        h('span', { class: 'stretch__tick', 'aria-hidden': 'true', text: '✓' })
+      ),
+      h('p', { class: 'u-note', text: 'Done for this session. Your joints will thank you next week.' }),
+      h('div', { class: 'row stretch__actions' },
+        h('button', { class: 'btn btn--sm', onclick: () => startStretchRun(day.idx, plan.list) }, 'Go through it again')
+      )
+    ];
+  }
+
+  /* what the session actually hammered, biggest first — so the list
+     visibly belongs to the workout above it */
+  const load = sessionLoad(day.items);
+  const top = Object.keys(load).sort((a, b) => load[b] - load[a]).slice(0, 3)
+    .map(m => MUSCLES[m].name.toLowerCase());
+
+  return [
+    h('div', { class: 'stretch__head' },
+      h('div', null,
+        h('p', { class: 'u-eyebrow', text: 'Optional · about ' + plan.minutes + ' min' }),
+        h('h2', { class: 'u-h3', text: 'Cool-down stretches' })
+      )
+    ),
+    h('p', { class: 'u-note stretch__lede' },
+      top.length ? 'Picked for what you just trained — ' + top.join(', ') + '.'
+                 : 'A short cool-down for this session.'),
+    h('ol', { class: 'stretch__list' }, plan.list.map(st => h('li', null,
+      h('span', { class: 'stretch__item-name', text: st.name }),
+      h('span', { class: 'stretch__item-time', text: st.hold + 's' + (st.uni ? ' each side' : '') })
+    ))),
+    h('div', { class: 'row stretch__actions' },
+      h('button', { class: 'btn btn--primary', onclick: () => startStretchRun(day.idx, plan.list) },
+        'Start the cool-down', h('span', { class: 'btn__arrow' }, '→')),
+      h('button', { class: 'btn btn--ghost btn--sm', onclick: () => { log.stretched = true; persist(); paintStretch(); } }, 'Skip it')
+    )
+  ];
+}
+
+function stretchCard(day) {
+  const card = h('section', { class: 'card stretch', id: 'stretchCard' });
+  add(card, stretchInner(day));
+  return card;
+}
+
+/* Rebuilds only the card, so finishing a stretch does not redraw the
+   session behind it. */
+function paintStretch() {
+  const card = document.getElementById('stretchCard');
+  if (!card) return;
+  const idx = stretchRun ? stretchRun.dayIdx : openDay;
+  const day = dayById(idx != null ? idx : (S.plan.days[0] || {}).idx);
+  if (!day) return;
+  card.textContent = '';
+  add(card, stretchInner(day));
+  updateStretchClock();
 }
 
 /* The question asked at the top of every session: how long have you got.
@@ -4363,19 +4786,7 @@ function exerciseCard(day, item, i) {
 
   /* for when the words are not enough, which is most of them the first
      time you meet a lift */
-  body.appendChild(h('div', { class: 'ex__see' },
-    h('span', { class: 'ex__see-label', text: 'Not sure how it looks?' }),
-    h('a', {
-      class: 'btn btn--sm', href: videoSearchURL(item.name),
-      target: '_blank', rel: 'noopener noreferrer',
-      'aria-label': 'Watch a video of ' + item.name + ', opens in a new tab'
-    }, 'Watch a video', h('span', { class: 'ex__see-out', 'aria-hidden': 'true' }, '↗')),
-    h('a', {
-      class: 'btn btn--sm', href: imageSearchURL(item.name),
-      target: '_blank', rel: 'noopener noreferrer',
-      'aria-label': 'See photos of ' + item.name + ', opens in a new tab'
-    }, 'See photos', h('span', { class: 'ex__see-out', 'aria-hidden': 'true' }, '↗'))
-  ));
+  body.appendChild(seeItRow(item.name));
 
   body.appendChild(h('div', { class: 'restrow' },
     h('span', { class: 'restrow__label', text: 'Rest ' + fmtRest(effectiveRest(item.rest)) + ' between sets' }),
@@ -4686,6 +5097,7 @@ function startNewWeek() {
     /* a new week asks how long you have again: last week's Tuesday says
        nothing about this week's */
     log.minutes = null;
+    log.stretched = false;
     Object.keys(log.entries).forEach(exId => log.entries[exId].forEach(e => { e.done = false; e.r = null; }));
   });
   S.week++;
@@ -5692,6 +6104,77 @@ function runSelfTests() {
     return TIMER_TICK_MS < 1000 || 'tick is ' + TIMER_TICK_MS + 'ms';
   });
 
+  /* A plan of its own for everything below. ?selftest=1 is most likely
+     to be opened by someone who has not been through setup yet, and a
+     test that only passes once you happen to have a plan saved is a test
+     that reports the wrong thing. */
+  const gatePlan = buildPlan(cfg({}));
+  const gateDay = gatePlan.days[0];
+
+  /* ---------- the cool-down ---------- */
+  t('every stretch names real muscles and gives real instructions', () => {
+    const seen = new Set();
+    for (const st of STRETCHES) {
+      if (seen.has(st.id)) return 'duplicate stretch id: ' + st.id;
+      seen.add(st.id);
+      if (!st.muscles.length) return st.id + ' stretches nothing';
+      for (const m of st.muscles) if (!MUSCLES[m]) return st.id + ' names an unknown muscle: ' + m;
+      if (!(st.hold >= 20 && st.hold <= 60)) return st.id + ' holds for ' + st.hold + 's';
+      if (!st.steps || st.steps.length < 2) return st.id + ' has no instructions';
+      if (st.steps.some(x => typeof x !== 'string' || !x.length)) return st.id + ' has an empty instruction';
+    }
+    return true;
+  });
+  t('every muscle the app trains has something that stretches it', () => {
+    for (const m of MUSCLE_IDS) {
+      if (!STRETCHES.some(st => st.muscles.indexOf(m) !== -1)) return 'nothing stretches ' + m;
+    }
+    return true;
+  });
+  t('a cool-down lands between three and five minutes', () => {
+    for (const day of gatePlan.days) {
+      const plan = stretchesFor(day.items);
+      if (plan.seconds < STRETCH_MIN_SECONDS || plan.seconds > STRETCH_MAX_SECONDS) {
+        return day.label + ' got ' + plan.seconds + 's';
+      }
+    }
+    return true;
+  });
+  t('the stretches are for the muscles that session actually worked', () => {
+    /* the real point of the feature: a leg day must not finish on a
+       doorway chest stretch */
+    for (const day of gatePlan.days) {
+      const load = sessionLoad(day.items);
+      const plan = stretchesFor(day.items);
+      for (const st of plan.list) {
+        if (!st.muscles.some(m => load[m] > 0)) {
+          return day.label + ' was given ' + st.id + ', which stretches nothing it trained';
+        }
+      }
+    }
+    return true;
+  });
+  t('a cool-down does not repeat the same stretch', () => {
+    for (const day of gatePlan.days) {
+      const ids = stretchesFor(day.items).list.map(x => x.id);
+      if (new Set(ids).size !== ids.length) return day.label + ' repeated one: ' + ids.join(',');
+    }
+    return true;
+  });
+  t('a one-sided stretch is counted, and run, twice', () => {
+    const uni = STRETCHES.find(x => x.uni), both = STRETCHES.find(x => !x.uni);
+    const costOK = stretchCost(uni) === uni.hold * 2 + STRETCH_CHANGEOVER &&
+                   stretchCost(both) === both.hold + STRETCH_CHANGEOVER;
+    const phases = stretchPhases([uni, both]);
+    const sidesOK = phases.length === 3 && phases[0].side === 'Left side' &&
+                    phases[1].side === 'Right side' && phases[2].side === null;
+    return (costOK && sidesOK) || 'cost ' + costOK + ', phases ' + phases.length;
+  });
+  t('a session that trained nothing is offered nothing', () => {
+    const plan = stretchesFor([]);
+    return plan.list.length === 0 || 'got ' + plan.list.length + ' stretches for an empty session';
+  });
+
   /* ---------- seeing the movement ---------- */
   t('every exercise can be looked up by name, and the name survives the URL', () => {
     for (const ex of LIB) {
@@ -5715,13 +6198,6 @@ function runSelfTests() {
   t('30 minutes is one of the offered answers', () => {
     return SESSION_MINUTE_CHOICES.indexOf(SESSION_MINUTES_DEFAULT) >= 0 || SESSION_MINUTE_CHOICES.join(',');
   });
-  /* These build their own plan rather than reading S.plan: ?selftest=1 is
-     most likely to be opened by someone who has not been through setup
-     yet, and a test that only passes once you happen to have a plan
-     saved is a test that reports the wrong thing. */
-  const gatePlan = buildPlan(cfg({}));
-  const gateDay = gatePlan.days[0];
-
   t('a shorter answer never gives you more work than a longer one', () => {
     let prev = -1;
     for (const m of SESSION_MINUTE_CHOICES) {
@@ -5937,6 +6413,7 @@ window.addEventListener('error', e => {
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (personalizeOpen) closePersonalize();
+    else if (stretchRun) { stopStretchRun(); paintStretch(); }
     else if (timer) stopTimer();
   });
 
