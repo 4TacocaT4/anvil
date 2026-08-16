@@ -20,7 +20,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'anvil-v1';
+const CACHE = 'anvil-v2';
 const SHELL = './index.html';
 const ASSETS = [
   './',
@@ -34,9 +34,14 @@ const ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE)
-      /* one missing icon must not fail the whole install, so each is
-         added on its own and allowed to fail quietly */
-      .then(cache => Promise.all(ASSETS.map(url => cache.add(url).catch(() => {}))))
+      /* One missing icon must not fail the whole install, so each is
+         added on its own and allowed to fail quietly. cache:'reload' for
+         the same reason as in fetch below: an install that populated
+         itself out of the browser's HTTP cache would bake in whatever
+         stale copy happened to be sitting there. */
+      .then(cache => Promise.all(ASSETS.map(url =>
+        cache.add(new Request(url, { cache: 'reload' })).catch(() => {})
+      )))
       .then(() => self.skipWaiting())
   );
 });
@@ -61,8 +66,15 @@ self.addEventListener('fetch', event => {
     (req.headers.get('accept') || '').indexOf('text/html') !== -1;
 
   if (wantsHTML) {
+    /* cache:'reload' is what makes this actually network-first. A plain
+       fetch() here is still allowed to be answered out of the browser's
+       own HTTP cache, and GitHub Pages serves the page with a ten-minute
+       max-age — so "network-first" quietly meant "up to ten minutes
+       stale, then stored in the service worker cache too". This forces a
+       real revalidation against the server. Offline it simply rejects,
+       which is the path that falls through to the cached copy below. */
     event.respondWith(
-      fetch(req)
+      fetch(new Request(req.url, { cache: 'reload', credentials: 'same-origin' }))
         .then(res => {
           /* keep the last good copy of the page for the next time
              there is no signal */
