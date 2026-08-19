@@ -5867,7 +5867,31 @@ function render() {
    Open index.html?selftest=1 and read the page. These check the
    maths and the generator, not the visuals.
    ============================================================ */
+/* The self tests drive the real functions, and some of those save — one
+   of them deliberately round-trips through storage to prove the deferred
+   write lands. So writes are allowed and the whole slot is put back
+   afterwards instead: nobody who opens ?selftest=1 on their own phone
+   should find their plan replaced by a fixture. */
+function storageSnapshot() {
+  try { return { ok: true, data: localStorage.getItem(APP.store) }; }
+  catch (e) { return { ok: false, data: null }; }   /* opaque origin: nothing to protect */
+}
+function storageRestore(snap) {
+  if (!snap || !snap.ok) return false;
+  try {
+    if (snap.data === null) localStorage.removeItem(APP.store);
+    else localStorage.setItem(APP.store, snap.data);
+    return true;
+  } catch (e) { return false; }
+}
+
 function runSelfTests() {
+  const snap = storageSnapshot();
+  try { return collectSelfTests(); }
+  finally { storageRestore(snap); }
+}
+
+function collectSelfTests() {
   const results = [];
   function t(name, fn) {
     try {
@@ -6775,6 +6799,17 @@ function runSelfTests() {
     S.plan = savedPlan; S.training = savedTraining;
     if (two || four) return 'accepted a different number of days';
     return stillThere === '0,2,4' || stillThere;
+  });
+  t('whatever the tests write to storage is put back afterwards', () => {
+    const snap = storageSnapshot();
+    /* nowhere to write means nothing to protect, and the run is safe by
+       default — the same reason the deferred-write test checks first */
+    if (!snap.ok) return true;
+    try { localStorage.setItem(APP.store, 'test-fixture-not-your-plan'); }
+    catch (e) { return true; }
+    if (!storageRestore(snap)) return 'the restore refused to run';
+    const back = localStorage.getItem(APP.store);
+    return back === snap.data || 'storage came back as ' + String(back).slice(0, 40);
   });
   t('changing how often you train clears this week but never your history', () => {
     const savedPlan = S.plan, savedTraining = S.training, savedLog = S.log, savedHistory = S.history;
