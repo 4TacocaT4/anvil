@@ -108,6 +108,10 @@ body{
   text-rendering:optimizeLegibility;
   overflow-x:hidden;
 }
+/* While a sheet is over the page, the page itself must not scroll — the
+   sheet has its own scrolling list, and two nested scrollers competing
+   for one drag is what makes a phone panel feel like it is ignoring you. */
+body.is-sheet-open{overflow:hidden}
 /* a single cool wash from the top of the window. It sits behind
    everything and never scrolls, which is what stops a long dark page
    from reading as a flat black rectangle. */
@@ -417,6 +421,36 @@ button{background:none;border:0;cursor:pointer;font-family:inherit;-webkit-tap-h
   background:linear-gradient(180deg,var(--surface-3),var(--surface-hi));
   color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4);
 }
+/* for a control with more segments than a narrow screen has room for:
+   wraps onto a second line rather than shrinking every label to nothing */
+.seg--wrap{flex-wrap:wrap}
+.seg--wrap .seg__btn{flex:1 0 auto;min-width:64px;min-height:40px}
+
+/* ============================================================
+   the week, as seven buttons
+   Setup and Settings share it. Thumb-sized on a phone by design:
+   this is a control you use standing in a gym, and a mis-tap moves a
+   training session.
+   ============================================================ */
+.dows{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow-btn{
+  display:flex;align-items:center;justify-content:center;
+  min-height:46px;padding:var(--s2) 2px;border-radius:var(--r-sm);
+  background:var(--bg-2);border:1px solid var(--line);
+  font-size:.8125rem;font-weight:600;color:var(--muted);
+  transition:background var(--t) var(--ease-out),color var(--t) var(--ease-out),
+             border-color var(--t) var(--ease-out),transform var(--t-fast) var(--ease-out);
+}
+.dow-btn:hover{color:var(--text);border-color:var(--muted)}
+.dow-btn:active{transform:scale(.94)}
+.dow-btn[aria-pressed="true"]{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-hi);
+}
+.dows__note{
+  font-size:.8125rem;color:var(--muted);line-height:1.5;margin:var(--s3) 0 0;
+  transition:color var(--t) var(--ease-out);
+}
+.dows__note.is-warn{color:var(--warn,var(--accent-hi))}
 
 /* ============================================================
    option list
@@ -629,9 +663,6 @@ button.chip:active{transform:scale(.94)}
   border-color:transparent;color:#fff;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 8px 20px -8px rgba(76,141,255,.85);
 }
-/* the same chips, shrunk to sit on one row of the personalize panel */
-.gate__choices--tight{justify-content:flex-end;max-width:200px;gap:4px}
-.gate__choices--tight .gate__chip{padding:5px 9px;font-size:.8125rem;font-weight:550}
 .gate__summary{
   margin:var(--s4) 0 0;font-size:.9375rem;color:var(--accent-hi);
   min-height:1.5em;line-height:1.5;
@@ -819,9 +850,14 @@ a.btn{text-decoration:none}
 /* ============================================================
    personalize
    ============================================================ */
+/* The panel is one scroll container, not a tall box inside a scrolling
+   backdrop. That distinction is the whole mobile fix: a flex backdrop
+   that scrolls while its child is aligned to an edge cannot be scrolled
+   back past that edge, so on a phone the top of this panel was simply
+   unreachable. Now the backdrop never scrolls and the list inside does. */
 .pz-overlay{
   position:fixed;inset:0;z-index:80;display:flex;justify-content:center;align-items:flex-start;
-  padding:var(--s5);overflow-y:auto;
+  padding:var(--s5);overflow:hidden;
   background:rgba(4,7,11,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
 }
 /* Only the first paint animates. Flipping a switch repaints the whole
@@ -831,24 +867,66 @@ a.btn{text-decoration:none}
 @keyframes pzFade{from{opacity:0}to{opacity:1}}
 .pz-panel{
   background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
-  box-shadow:var(--lift-hi);max-width:460px;width:100%;padding:var(--s5);
-  margin-top:var(--s6);height:fit-content;
+  box-shadow:var(--lift-hi);max-width:460px;width:100%;
+  margin-top:var(--s6);
+  display:flex;flex-direction:column;min-height:0;
+  max-height:calc(100% - var(--s6));
 }
 .pz-anim .pz-panel{animation:pzPanel .34s var(--ease-out) both}
 @keyframes pzPanel{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
 /* each preference drops in behind the panel, top to bottom */
-.pz-anim .pz-row,
-.pz-anim .pz-panel>.field{animation:a-rise-sm .32s var(--ease-out) both}
+.pz-anim .pz-row{animation:a-rise-sm .32s var(--ease-out) both}
 .pz-panel:focus{outline:none}
-.pz-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s4);margin-bottom:var(--s5)}
-.pz-row{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);padding:var(--s4) 0;border-top:1px solid var(--line)}
+/* the drag handle a sheet is expected to have; decorative on desktop */
+.pz-grip{display:none}
+.pz-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s4);
+  flex:none;padding:var(--s5) var(--s5) var(--s4);
+}
+.pz-close{flex:none;min-height:40px}
+/* the only thing that scrolls */
+.pz-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding:0 var(--s5) var(--s5);
+}
+.pz-row{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s4);
+  padding:var(--s4) 0;border-top:1px solid var(--line);
+}
+.pz-row:first-child{border-top:none;padding-top:0}
+/* wide controls sit under their label rather than beside it */
+.pz-row--block{display:block}
+.pz-row__wide{margin-top:var(--s3)}
+.pz-row__text{min-width:0}
 .pz-row__title{font-size:.9375rem;font-weight:600;color:var(--text);margin:0}
 .pz-row__desc{font-size:.8125rem;color:var(--muted);margin:2px 0 0;line-height:1.5}
+
+/* advanced: the settings almost nobody needs, folded away */
+.pz-adv{border-top:1px solid var(--line);margin-top:var(--s2)}
+.pz-adv__toggle{
+  display:flex;align-items:center;gap:var(--s2);width:100%;
+  padding:var(--s4) 0;background:none;border:none;
+  font-size:.8125rem;font-weight:600;letter-spacing:.02em;color:var(--muted);
+  min-height:44px;
+}
+.pz-adv__toggle:hover{color:var(--text)}
+.pz-adv__caret{
+  display:inline-block;font-size:.75rem;
+  transition:transform var(--t) var(--ease-out);
+}
+.pz-adv.is-open .pz-adv__caret{transform:rotate(90deg)}
+.pz-adv__body{animation:a-rise-sm .28s var(--ease-out) both}
+.pz-adv__body .pz-row:first-child{border-top:1px solid var(--line);padding-top:var(--s4)}
+
+/* 42x24 is the drawn size; the padding box is stretched to a 44px
+   touch target so it is not a game of accuracy on a phone. */
 .pz-switch{
   position:relative;width:42px;height:24px;flex:none;border-radius:var(--r-pill);
   background:var(--surface-3);border:1px solid var(--line);
   transition:background .16s var(--ease),border-color .16s var(--ease);
 }
+.pz-switch::after{content:'';position:absolute;inset:-11px -6px}
 .pz-switch::before{
   content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
   background:var(--muted);transition:transform .16s var(--ease),background .16s var(--ease);
@@ -1047,9 +1125,29 @@ a.btn{text-decoration:none}
   .volrow{grid-template-columns:88px 1fr 42px}
   .session__stats{gap:var(--s4)}
   .hero-facts{gap:var(--s4) !important}
-  .pz-overlay{padding:var(--s4);align-items:flex-end}
-  .pz-panel{margin-top:0}
-  /* on a phone it is a sheet, so it comes up from the edge it is docked to */
+  /* On a phone it is a bottom sheet: edge to edge, docked to the bottom,
+     and tall enough that the list inside is worth scrolling. It stops
+     short of the top so the screen behind stays visible — a sheet you
+     can see past reads as something you can dismiss. */
+  .pz-overlay{padding:0;align-items:flex-end}
+  .pz-panel{
+    margin-top:0;max-width:none;
+    height:88vh;max-height:88vh;
+    border-radius:var(--r-lg) var(--r-lg) 0 0;
+    border-left:none;border-right:none;border-bottom:none;
+  }
+  /* dvh where it exists: on iOS Safari, vh includes the address bar that
+     is not actually there, so the bottom of the sheet sits off-screen */
+  @supports (height:88dvh){
+    .pz-panel{height:88dvh;max-height:88dvh}
+  }
+  .pz-grip{
+    display:block;flex:none;width:36px;height:4px;border-radius:2px;
+    background:var(--line-hi);margin:var(--s3) auto 0;
+  }
+  .pz-head{padding:var(--s4) var(--s4) var(--s3)}
+  .pz-body{padding:0 var(--s4) var(--s6)}
+  /* it comes up from the edge it is docked to */
   .pz-anim .pz-panel{animation-name:pzSheet}
   @keyframes pzSheet{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
 }
@@ -1086,7 +1184,9 @@ a.btn{text-decoration:none}
     padding-bottom:calc(var(--s8) + env(safe-area-inset-bottom));
   }
   .timer{bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
-  .pz-overlay{padding-bottom:calc(var(--s4) + env(safe-area-inset-bottom))}
+  /* the sheet now reaches the bottom edge, so the inset belongs to the
+     list inside it — otherwise the last row sits under the home bar */
+  .pz-body{padding-bottom:calc(var(--s6) + env(safe-area-inset-bottom))}
 }
 @media (min-width:641px){
   @supports (padding:env(safe-area-inset-top)){
@@ -1684,7 +1784,10 @@ const SPLITS = {
   ]
 };
 
-/* which weekday each session lands on, by training frequency */
+/* Where the sessions land when you have not said otherwise: sensible
+   spacing for each frequency. Used as the opening answer to "which days
+   can you train", and as the fallback for saved state from before that
+   question existed. */
 const DAY_MAP = {
   2: [0, 3],
   3: [0, 2, 4],
@@ -1693,6 +1796,36 @@ const DAY_MAP = {
   6: [0, 1, 2, 3, 4, 5]
 };
 const DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DOW_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const DAYS_MIN = 2, DAYS_MAX = 6;
+
+/* A weekday list is only usable if it is sorted, free of duplicates, in
+   range, and exactly as long as the number of sessions the split has to
+   place. Anything else falls back to the default spacing rather than
+   half-applying it — a plan with two sessions stacked on Tuesday is
+   worse than one that quietly used the standard week. */
+function validDows(list, count) {
+  if (!Array.isArray(list) || list.length !== count) return false;
+  const seen = new Set();
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i];
+    if (typeof d !== 'number' || !isFinite(d) || d < 0 || d > 6 || Math.floor(d) !== d) return false;
+    if (seen.has(d)) return false;
+    seen.add(d);
+  }
+  return true;
+}
+function sortDows(list) { return list.slice().sort((a, b) => a - b); }
+function dowsFor(count, list) {
+  return validDows(list, count) ? sortDows(list) : (DAY_MAP[count] || DAY_MAP[3]).slice();
+}
+/* "Mon, Wed and Fri" — for a summary line, where a comma-separated run
+   of three-letter stubs reads like a code rather than a sentence. */
+function dowsSentence(list) {
+  const names = sortDows(list).map(d => DOW[d]);
+  if (names.length <= 1) return names.join('');
+  return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+}
 
 const EXPERIENCE = [
   { id:'new',  name:'New to lifting', desc:'Under a year of consistent training, or coming back after a long break.', mainSets:3, accSets:3, load:0.65 },
@@ -2471,7 +2604,9 @@ function buildPlan(cfg) {
   const seedStr = [cfg.days, split.id, cfg.experience, cfg.length, (cfg.focus || []).join('.'), cfg.equipment.slice().sort().join('.')].join('|');
   const rng = makeRng(hashSeed(seedStr) + (cfg.shuffle || 0) * 7919);
   const used = new Map();
-  const dayNums = DAY_MAP[cfg.days] || DAY_MAP[3];
+  /* Deliberately not part of the seed above: moving Wednesday to
+     Thursday should move the session, not hand you a different one. */
+  const dayNums = dowsFor(cfg.days, cfg.dows);
 
   /* ---- pass 1: fill every template slot ---- */
   const days = split.days.map((tplKey, i) => {
@@ -2607,7 +2742,11 @@ function blankState() {
     v: APP.version,
     step: 0,
     profile: { sex: 'male', age: null, height: null, weight: null },
-    training: { days: 4, length: 60, experience: 'int', focus: [], equipment: EQUIP_PRESETS.home.ids.slice(), splitId: null, shuffle: 0 },
+    training: {
+      days: 4, dows: DAY_MAP[4].slice(),
+      length: 60, experience: 'int', focus: [],
+      equipment: EQUIP_PRESETS.home.ids.slice(), splitId: null, shuffle: 0
+    },
     plan: null,
     log: {},
     history: [],
@@ -2652,7 +2791,8 @@ function planCode(st) {
   return CODE_PREFIX + utf8ToB64(JSON.stringify({
     p: s0.profile,
     t: {
-      days: t.days, length: t.length, experience: t.experience,
+      days: t.days, dows: dowsFor(t.days, t.dows),
+      length: t.length, experience: t.experience,
       focus: t.focus, equipment: t.equipment, splitId: t.splitId, shuffle: t.shuffle || 0
     }
   })).replace(/=+$/, '');
@@ -2674,8 +2814,11 @@ function readPlanCode(raw, st) {
     sex: p.sex === 'female' ? 'female' : 'male',
     age: Number(p.age) || null, height: Number(p.height) || null, weight: Number(p.weight) || null
   };
+  const codeDays = clamp(Number(t.days) || 4, DAYS_MIN, DAYS_MAX);
   st.training = {
-    days: clamp(Number(t.days) || 4, 2, 6),
+    days: codeDays,
+    /* an older code carries no weekdays; dowsFor falls back for it */
+    dows: dowsFor(codeDays, t.dows),
     length: clamp(Math.round((Number(t.length) || 60) / LENGTH_STEP) * LENGTH_STEP, LENGTH_MIN, LENGTH_MAX),
     experience: EXPERIENCE.some(x => x.id === t.experience) ? t.experience : 'int',
     focus: t.focus.slice(), equipment: t.equipment.slice(),
@@ -2867,15 +3010,52 @@ function syncAge() { CURRENT_AGE = (S.profile.age && isFinite(S.profile.age)) ? 
    moment anything asks for it.
    ============================================================ */
 const SETTINGS_DEFAULTS = {
-  restAdjust: 0, autoStartTimer: true, vibrate: true, wakeLock: false,
-  /* what the "how long have you got" question opens on */
-  defaultSessionMinutes: SESSION_MINUTES_DEFAULT,
+  restAdjust: 0,
+  /* one answer for "tell me when rest is up", not two switches for the
+     same event: sound, buzz, both, or neither */
+  alert: 'both',
+  wakeLock: false,
   /* the cool-down block at the end of a session */
   showStretch: true
 };
+
+const ALERT_MODES = [
+  { id: 'both',  label: 'Both',  needsBuzz: true },
+  { id: 'sound', label: 'Sound', needsBuzz: false },
+  { id: 'buzz',  label: 'Buzz',  needsBuzz: true },
+  { id: 'off',   label: 'Off',   needsBuzz: false }
+];
+function alertFromLegacy(sound, buzz) {
+  if (sound && buzz) return 'both';
+  if (sound) return 'sound';
+  if (buzz) return 'buzz';
+  return 'off';
+}
+
+/* Backfills in place and hands back the same object every time. It used
+   to build a fresh one per call, which quietly broke any write whose
+   right-hand side also read a setting: JavaScript resolves the target of
+   `settings().x = ...` before evaluating what to store, so the inner
+   call replaced the object and the assignment landed on the discarded
+   one. Mutating what is already there removes the trap rather than
+   leaving it for the next caller to trip over. */
 function settings() {
-  S.settings = Object.assign({}, SETTINGS_DEFAULTS, S.settings || {});
-  return S.settings;
+  const st = S.settings || (S.settings = {});
+  /* Saves from before the merge kept the buzz here and the sound as a
+     top-level mute. Fold them into one answer the first time anything
+     asks, so nobody's choice is silently reset. */
+  if (st.alert === undefined) st.alert = alertFromLegacy(!S.mute, st.vibrate !== false);
+  for (const k in SETTINGS_DEFAULTS) {
+    if (st[k] === undefined) st[k] = SETTINGS_DEFAULTS[k];
+  }
+  return st;
+}
+function alertSound() { const a = settings().alert; return a === 'both' || a === 'sound'; }
+function alertBuzz() { const a = settings().alert; return a === 'both' || a === 'buzz'; }
+/* Toggling sound alone, from the button on the timer itself */
+function toggleAlertSound() {
+  const next = alertFromLegacy(!alertSound(), alertBuzz());
+  settings().alert = next;
 }
 
 const REST_ADJUST_MIN = -60, REST_ADJUST_MAX = 90, REST_ADJUST_STEP = 15;
@@ -2894,7 +3074,7 @@ function fmtRest(sec) {
 }
 
 function vibrateAlert() {
-  if (!settings().vibrate) return;
+  if (!alertBuzz()) return;
   try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) { /* unsupported is fine */ }
 }
 
@@ -2930,9 +3110,13 @@ function pzSwitch(checked, onToggle) {
   });
 }
 
+/* A row with its control on the right. Only for controls that are
+   genuinely small — a switch. Anything wider goes in a pzBlock, because
+   squeezing a seven-button week in beside a two-line description is how
+   a settings screen becomes unusable on a phone. */
 function pzRow(title, desc, control) {
   return h('div', { class: 'pz-row' },
-    h('div', null,
+    h('div', { class: 'pz-row__text' },
       h('p', { class: 'pz-row__title', text: title }),
       desc ? h('p', { class: 'pz-row__desc', text: desc }) : null
     ),
@@ -2940,9 +3124,46 @@ function pzRow(title, desc, control) {
   );
 }
 
+/* Title and description above, control below, full width. */
+function pzBlock(title, desc, control) {
+  return h('div', { class: 'pz-row pz-row--block' },
+    h('div', { class: 'pz-row__text' },
+      h('p', { class: 'pz-row__title', text: title }),
+      desc ? h('p', { class: 'pz-row__desc', text: desc }) : null
+    ),
+    h('div', { class: 'pz-row__wide' }, control)
+  );
+}
+
+/* A row of choices where exactly one is on. */
+function pzSeg(value, options, onPick, label) {
+  const seg = h('div', { class: 'seg seg--wrap', role: 'group', 'aria-label': label || '' });
+  options.forEach(o => {
+    seg.appendChild(h('button', {
+      class: 'seg__btn', type: 'button',
+      'aria-pressed': value === o.id ? 'true' : 'false',
+      onclick: () => onPick(o.id)
+    }, o.label));
+  });
+  return seg;
+}
+
+/* Where the panel's list was scrolled to. The panel is rebuilt whenever
+   anything in it changes, and without this every toggle threw you back
+   to the top — which on a phone, where most rows are below the fold, is
+   most of why this screen was hard to use. */
+let pzScroll = 0;
+let pzAdvanced = false;
+/* Whether the press that is about to become a click started on the
+   backdrop. A drag that begins on the panel and ends past its edge is a
+   scroll that ran out of list, not a request to close. */
+let pzPressedBackdrop = false;
+
 function openPersonalize() {
   personalizeOpen = true;
   pzAnimate = true;
+  pzScroll = 0;
+  pzAdvanced = false;
   paintPersonalize();
   pzAnimate = false;
 }
@@ -2956,7 +3177,11 @@ function closePersonalize() {
 function paintPersonalize() {
   const mount = $('#personalizeMount');
   if (!mount) return;
+  const prev = mount.querySelector('.pz-body');
+  if (prev) pzScroll = prev.scrollTop;
   mount.textContent = '';
+  /* the page behind must not scroll while a full-height sheet is over it */
+  document.body.classList.toggle('is-sheet-open', personalizeOpen);
   if (!personalizeOpen) return;
   const st = settings();
 
@@ -2989,74 +3214,78 @@ function paintPersonalize() {
   restSlider.style.setProperty('--fill', ((st.restAdjust - REST_ADJUST_MIN) / (REST_ADJUST_MAX - REST_ADJUST_MIN) * 100) + '%');
 
   const panel = h('div', {
-    class: 'pz-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Personalize', tabindex: '-1',
-    onclick: e => e.stopPropagation()
+    class: 'pz-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Personalize', tabindex: '-1'
   });
 
+  /* The header stays put while the list moves under it, so Close is
+     always one thumb away instead of scrolled off the top. */
+  panel.appendChild(h('div', { class: 'pz-grip', 'aria-hidden': 'true' }));
   panel.appendChild(h('div', { class: 'pz-head' },
     h('div', null,
       h('p', { class: 'u-eyebrow', text: 'Personalize' }),
       h('h2', { class: 'u-h2', text: 'Make it yours' })
     ),
-    h('button', { class: 'btn btn--sm btn--ghost', 'aria-label': 'Close', onclick: closePersonalize }, 'Close')
+    h('button', { class: 'btn btn--sm btn--ghost pz-close', 'aria-label': 'Close', onclick: closePersonalize }, 'Close')
   ));
 
-  panel.appendChild(h('div', { class: 'field', style: { marginBottom: 'var(--s2)' } },
-    h('div', { class: 'row row--between', style: { marginBottom: '2px' } },
-      h('span', { class: 'field__label', text: 'Rest between sets' }),
-      restVal
-    ),
-    restSlider,
-    h('div', { class: 'row row--between' },
-      h('span', { class: 'u-note', text: REST_ADJUST_MIN + 's' }),
-      restNote,
-      h('span', { class: 'u-note', text: '+' + REST_ADJUST_MAX + 's' })
-    ),
-    restExample
-  ));
+  const body = h('div', { class: 'pz-body' });
+  panel.appendChild(body);
 
-  const minsSeg = h('div', { class: 'gate__choices gate__choices--tight' });
-  SESSION_MINUTE_CHOICES.forEach(m => {
-    minsSeg.appendChild(h('button', {
-      class: 'gate__chip', type: 'button',
-      'aria-pressed': (st.defaultSessionMinutes === m) ? 'true' : 'false',
-      onclick: () => { settings().defaultSessionMinutes = m; persist(); paintPersonalize(); }
-    }, String(m)));
-  });
-  panel.appendChild(pzRow('Time the session asks for first',
-    'Every workout starts by asking how long you have. This is the answer it opens on — in minutes.',
-    minsSeg));
-
-  panel.appendChild(pzRow('Offer a cool-down', 'A three-to-five minute stretch at the end of each session, picked for the muscles that session worked. Off removes it entirely.',
-    pzSwitch(st.showStretch, () => { settings().showStretch = !st.showStretch; persist(); paintPersonalize(); render(); })));
-
-  panel.appendChild(pzRow('Start my rest timer automatically', 'Off means ticking a set no longer starts the countdown for you — start it yourself when you are ready.',
-    pzSwitch(st.autoStartTimer, () => { settings().autoStartTimer = !st.autoStartTimer; persist(); paintPersonalize(); })));
-
-  panel.appendChild(pzRow('Sound when rest is up', 'A short beep when the countdown hits zero.',
-    pzSwitch(!S.mute, () => { S.mute = !S.mute; persist(); paintPersonalize(); paintTimer(); })));
-
-  if ('vibrate' in navigator) {
-    panel.appendChild(pzRow('Vibrate when rest is up', 'A short buzz alongside — or instead of — the sound.',
-      pzSwitch(st.vibrate, () => { settings().vibrate = !st.vibrate; persist(); paintPersonalize(); })));
-  }
-
-  if ('wakeLock' in navigator) {
-    panel.appendChild(pzRow('Keep the screen awake', 'Stops your phone locking mid-session. Uses a bit more battery.',
-      pzSwitch(st.wakeLock, () => {
-        settings().wakeLock = !st.wakeLock;
+  /* ---------- which days you train ----------
+     Only ever moves the sessions you already have. How many there are
+     changes the split and rebuilds the plan, so it lives under Advanced
+     where you will not hit it by accident. */
+  if (S.plan) {
+    const T = S.training;
+    body.appendChild(pzBlock('Training days',
+      'Tap a day off and another on to move a session. Your plan and everything you have logged stay exactly as they are.',
+      weekdayPicker(T.dows, list => {
+        if (!moveTrainingDays(list)) return;
         persist();
-        if (settings().wakeLock) requestWakeLock(); else releaseWakeLock();
-        paintPersonalize();
-      })));
+        render();
+      }, { fixed: T.days })));
   }
+
+  body.appendChild(h('div', { class: 'pz-row pz-row--block' },
+    h('div', { class: 'field' },
+      h('div', { class: 'row row--between', style: { marginBottom: '2px' } },
+        h('span', { class: 'field__label', text: 'Rest between sets' }),
+        restVal
+      ),
+      restSlider,
+      h('div', { class: 'row row--between' },
+        h('span', { class: 'u-note', text: REST_ADJUST_MIN + 's' }),
+        restNote,
+        h('span', { class: 'u-note', text: '+' + REST_ADJUST_MAX + 's' })
+      ),
+      restExample
+    )
+  ));
+
+  /* One event, one answer. This used to be two switches — a sound one
+     and a buzz one — for the same moment, which is two questions to
+     answer where there is only one thing you want to say. */
+  const canBuzz = 'vibrate' in navigator;
+  const modes = ALERT_MODES.filter(m => canBuzz || !m.needsBuzz);
+  body.appendChild(pzBlock('When rest is up',
+    canBuzz ? 'A short beep, a buzz, or both when the countdown hits zero.'
+            : 'A short beep when the countdown hits zero.',
+    pzSeg(st.alert, modes, id => {
+      settings().alert = id;
+      persist();
+      paintPersonalize();
+      paintTimer();
+    }, 'When rest is up')));
+
+  body.appendChild(pzRow('Offer a cool-down', 'A three-to-five minute stretch at the end of each session, picked for the muscles that session worked. Off removes it entirely.',
+    pzSwitch(st.showStretch, () => { settings().showStretch = !st.showStretch; persist(); paintPersonalize(); render(); })));
 
   /* Installing is the difference between a browser tab you have to find
      again and an icon on the home screen that opens with no address bar
      and no signal. The row only exists when the browser has actually
      offered the prompt, so it is never a button that does nothing. */
   if (installPrompt) {
-    panel.appendChild(pzRow('Install Anvil', 'Puts it on your home screen and lets it open without a connection.',
+    body.appendChild(pzRow('Install Anvil', 'Puts it on your home screen and lets it open without a connection.',
       h('button', {
         class: 'btn btn--sm btn--primary',
         onclick: () => {
@@ -3067,20 +3296,103 @@ function paintPersonalize() {
         }
       }, 'Install')));
   } else if (isStandalone()) {
-    panel.appendChild(pzRow('Installed', 'Anvil is running from your home screen and works with no connection.',
+    body.appendChild(pzRow('Installed', 'Anvil is running from your home screen and works with no connection.',
       h('span', { class: 'chip', text: 'Ready offline' })));
   }
 
+  /* ---------- advanced ----------
+     Everything you are unlikely to want and would rather not scroll past
+     every time. Closed by default; opening it does not move the rows
+     above, so nothing you were reading jumps. */
+  const adv = h('div', { class: 'pz-adv' + (pzAdvanced ? ' is-open' : '') });
+  adv.appendChild(h('button', {
+    class: 'pz-adv__toggle', type: 'button', 'aria-expanded': pzAdvanced ? 'true' : 'false',
+    onclick: () => { pzAdvanced = !pzAdvanced; paintPersonalize(); }
+  },
+    h('span', { class: 'pz-adv__caret', 'aria-hidden': 'true' }, '▸'),
+    h('span', { text: 'Advanced' })
+  ));
+
+  if (pzAdvanced) {
+    const inner = h('div', { class: 'pz-adv__body' });
+
+    if (S.plan) {
+      const T = S.training;
+      inner.appendChild(pzBlock('How often you train',
+        'This changes your split, so Anvil rebuilds the week and clears the ticks on it. Sessions you have finished stay in your history.',
+        pzSeg(T.days,
+          [2, 3, 4, 5, 6].map(n => ({ id: n, label: n + ' days' })),
+          n => setTrainingFrequency(n),
+          'Sessions a week')));
+    }
+
+    if ('wakeLock' in navigator) {
+      inner.appendChild(pzRow('Keep the screen awake', 'Stops your phone locking mid-session. Uses a bit more battery.',
+        pzSwitch(st.wakeLock, () => {
+          settings().wakeLock = !st.wakeLock;
+          persist();
+          if (settings().wakeLock) requestWakeLock(); else releaseWakeLock();
+          paintPersonalize();
+        })));
+    }
+
+    adv.appendChild(inner);
+  }
+  body.appendChild(adv);
+
   if (pzAnimate) {
     let n = 0;
-    panel.querySelectorAll('.pz-row, .pz-panel>.field').forEach(row => {
-      row.style.animationDelay = (60 + (n++) * 45) + 'ms';
+    body.querySelectorAll('.pz-row').forEach(row => {
+      row.style.animationDelay = (60 + (n++) * 40) + 'ms';
     });
   }
 
-  const overlay = h('div', { class: 'pz-overlay' + (pzAnimate ? ' pz-anim' : ''), onclick: closePersonalize }, panel);
+  const overlay = h('div', { class: 'pz-overlay' + (pzAnimate ? ' pz-anim' : '') }, panel);
+  overlay.addEventListener('pointerdown', e => { pzPressedBackdrop = (e.target === overlay); });
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay && pzPressedBackdrop) closePersonalize();
+  });
   mount.appendChild(overlay);
-  panel.focus({ preventScroll: true });
+  /* put the list back exactly where it was before this repaint */
+  body.scrollTop = pzScroll;
+  if (pzAnimate) panel.focus({ preventScroll: true });
+}
+
+/* Changing how often you train is a rebuild, not a preference: the split
+   is chosen by frequency, so a different number of sessions means
+   different sessions. The days you already picked are kept where they
+   fit — going four to five adds a day rather than rearranging your week
+   — and your log is untouched. */
+function reshapeDows(list, n) {
+  const cur = sortDows((list || []).filter(d => typeof d === 'number' && d >= 0 && d <= 6));
+  if (cur.length >= n) return cur.slice(0, n);
+  const out = cur.slice();
+  const fill = (DAY_MAP[n] || DAY_MAP[3]).concat([0, 1, 2, 3, 4, 5, 6]);
+  for (let i = 0; i < fill.length && out.length < n; i++) {
+    if (out.indexOf(fill[i]) === -1) out.push(fill[i]);
+  }
+  return sortDows(out);
+}
+
+function setTrainingFrequency(n) {
+  const T = S.training;
+  n = clamp(n, DAYS_MIN, DAYS_MAX);
+  if (n === T.days) return;
+  T.dows = reshapeDows(T.dows, n);
+  T.days = n;
+  T.splitId = null;
+  rebuildPlan();
+  /* This week's ticks belonged to sessions that no longer exist — a
+     four-day Upper/Lower week and a three-day full-body week share
+     nothing but their numbering, so carrying the marks across would
+     show a session you have never done as finished. Sessions you
+     actually completed live in history and are untouched; the same rule
+     a plan code follows when it replaces the plan underneath you. */
+  S.log = {};
+  openDay = null;
+  persist();
+  render();
+  paintPersonalize();
 }
 
 /* ============================================================
@@ -3183,6 +3495,90 @@ function optionList(items, selectedId, onPick, meta) {
     ));
   });
   return wrap;
+}
+
+/* ---------- the week, as seven buttons ----------
+
+   Two callers with different rules. Setup is free: tick between two and
+   six days and however many you tick becomes how often you train.
+   Settings is fixed: it moves the sessions you already have and will not
+   add or drop one, because changing how many there are changes the split
+   and rebuilds the plan — that is a decision, not a preference, so it
+   lives behind Advanced instead.
+
+   In fixed mode you can always turn a day off but can only turn one on
+   while there is a free slot. That falls out as the obvious swap: drop
+   Wednesday, pick Thursday, done — and until the count is back to full
+   nothing is applied, so the plan is never briefly missing a session.
+
+   The picker owns its own DOM and repaints itself in place. Rebuilding
+   the screen under a thumb mid-swap is exactly the kind of thing that
+   makes a panel feel like it is fighting you. */
+function weekdayPicker(selected, onCommit, opts) {
+  opts = opts || {};
+  const fixed = opts.fixed || 0;
+  let picked = sortDows((selected || []).filter(d => d >= 0 && d <= 6));
+  let blocked = '';
+
+  const row = h('div', { class: 'dows', role: 'group', 'aria-label': 'Days of the week' });
+  const note = h('p', { class: 'dows__note' });
+
+  function complete() { return fixed ? picked.length === fixed : picked.length >= DAYS_MIN; }
+
+  function paint() {
+    Array.prototype.forEach.call(row.children, btn => {
+      const d = Number(btn.dataset.dow);
+      const on = picked.indexOf(d) !== -1;
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.setAttribute('aria-label', DOW_FULL[d] + (on ? ', training' : ', rest'));
+    });
+    if (blocked) { note.textContent = blocked; note.className = 'dows__note is-warn'; return; }
+    note.className = 'dows__note';
+    if (fixed && picked.length < fixed) {
+      const left = fixed - picked.length;
+      note.textContent = 'Pick ' + left + ' more ' + (left === 1 ? 'day' : 'days') + ' to finish the swap.';
+    } else if (!fixed && picked.length < DAYS_MIN) {
+      note.textContent = 'Pick at least ' + DAYS_MIN + ' days.';
+    } else {
+      note.textContent = picked.length + ' ' + (picked.length === 1 ? 'day' : 'days') + ' a week — ' + dowsSentence(picked) + '.';
+    }
+  }
+
+  function toggle(d) {
+    const at = picked.indexOf(d);
+    blocked = '';
+    if (at !== -1) {
+      if (!fixed && picked.length <= DAYS_MIN) {
+        blocked = 'You need at least ' + DAYS_MIN + ' days a week for a plan worth following.';
+        paint();
+        return;
+      }
+      picked = picked.filter(x => x !== d);
+    } else {
+      const cap = fixed || DAYS_MAX;
+      if (picked.length >= cap) {
+        blocked = fixed
+          ? 'Turn a day off first, then pick this one.'
+          : DAYS_MAX + ' days is the most Anvil will plan for.';
+        paint();
+        return;
+      }
+      picked = sortDows(picked.concat([d]));
+    }
+    paint();
+    if (complete()) onCommit(picked.slice());
+  }
+
+  for (let d = 0; d < 7; d++) {
+    const btn = h('button', {
+      class: 'dow-btn', type: 'button', 'aria-pressed': 'false',
+      onclick: () => toggle(d)
+    }, h('span', { class: 'dow-btn__day', text: DOW[d] }));
+    btn.dataset.dow = String(d);
+    row.appendChild(btn);
+  }
+  paint();
+  return h('div', { class: 'dows-wrap' }, row, note);
 }
 
 function segControl(label, values, current, onPick, hint) {
@@ -3489,12 +3885,21 @@ function stepYou() {
 function stepTraining() {
   const T = S.training;
   const wrap = h('section', { class: 'step' });
-  wrap.appendChild(stepHead('Step 2 of 5 · Training', 'How often can you train?',
-    'Be honest about the week you actually have, not the one you wish you had. Three good days beat five you skip.'));
+  wrap.appendChild(stepHead('Step 2 of 5 · Training', 'Which days can you train?',
+    'Tick the days you can actually be there, not the ones you wish you could. Three days you keep beat five you skip — and Anvil builds the week around the days you pick.'));
 
-  const daysField = segControl('Days per week',
-    [2, 3, 4, 5, 6].map(n => ({ id: n, label: String(n) })), T.days,
-    id => { T.days = id; T.splitId = null; persist(); render(); });
+  const daysField = h('div', { class: 'field' },
+    h('span', { class: 'field__label', text: 'Training days' }),
+    weekdayPicker(T.dows, list => {
+      /* how many you ticked is how often you train, so a different
+         count means a different split — drop the old choice and let
+         the generator pick the standard one for the new frequency */
+      if (list.length !== T.days) { T.days = list.length; T.splitId = null; }
+      T.dows = list;
+      persist();
+    }),
+    h('span', { class: 'field__hint', text: 'You can move these around later without losing anything you have logged.' })
+  );
 
   /* live readout, updated as the slider moves rather than on release,
      and only re-rendering the whole step once the drag finishes */
@@ -3533,15 +3938,12 @@ function stepTraining() {
     optionList(EXPERIENCE, T.experience, id => { T.experience = id; persist(); render(); })
   );
 
-  const splits = splitsFor(T.days);
-  const chosen = T.splitId || splits[0].id;
-  const splitField = h('div', { class: 'field' },
-    h('span', { class: 'field__label', text: 'Split' }),
-    optionList(splits.map(sp => ({ id: sp.id, name: sp.name, desc: sp.note })), chosen,
-      id => { T.splitId = id; persist(); render(); })
-  );
-
-  wrap.appendChild(h('div', { class: 'stack-6' }, daysField, lenField, expField, splits.length > 1 ? splitField : null));
+  /* No split picker here any more. Anvil already knows the standard
+     split for the number of days you train, and asking someone to
+     choose between Upper/Lower and Push/Pull/Legs before they have seen
+     either is a question with no good way to answer it. The Week tab
+     offers the alternative once there is a real plan to compare it to. */
+  wrap.appendChild(h('div', { class: 'stack-6' }, daysField, lenField, expField));
   wrap.appendChild(navRow(() => goStep(1), 'Continue', () => goStep(3)));
   return wrap;
 }
@@ -3752,8 +4154,10 @@ function stepReview() {
 
   const rows = [
     ['You', fmt1(p.weight) + ' kg · ' + p.height + ' cm · ' + p.age + ' yrs · ' + (p.sex === 'male' ? 'male' : 'female'), 1],
-    ['Week', T.days + ' days · ' + T.length + ' min a session · ' + exp.name.toLowerCase(), 2],
-    ['Split', split.name, 2],
+    ['Days', dowsSentence(dowsFor(T.days, T.dows)), 2],
+    ['Week', T.length + ' min a session · ' + exp.name.toLowerCase(), 2],
+    /* derived from the day count now, so there is nothing to change here */
+    ['Split', split.name, null],
     ['Focus', T.focus.length ? T.focus.map(r => REGIONS[r].name).join(', ') : 'Balanced, nothing prioritised', 3],
     ['Equipment', T.equipment.length + ' items · ' + count + ' exercises available', 4]
   ];
@@ -3764,7 +4168,7 @@ function stepReview() {
         h('span', { class: 'u-eyebrow', style: { display: 'block' }, text: label }),
         h('span', { style: { fontSize: '.9375rem', fontWeight: '550' }, text: value })
       ),
-      h('button', { class: 'btn btn--sm btn--ghost', onclick: () => goStep(step) }, 'Change')
+      step ? h('button', { class: 'btn btn--sm btn--ghost', onclick: () => goStep(step) }, 'Change') : null
     ));
   });
   wrap.appendChild(card);
@@ -3786,11 +4190,30 @@ function stepReview() {
 function rebuildPlan() {
   const T = S.training;
   if (!T.splitId) T.splitId = splitsFor(T.days)[0].id;
+  T.dows = dowsFor(T.days, T.dows);
   S.plan = buildPlan({
-    days: T.days, length: T.length, experience: T.experience,
+    days: T.days, dows: T.dows, length: T.length, experience: T.experience,
     focus: T.focus, equipment: T.equipment, splitId: T.splitId,
     shuffle: T.shuffle || 0, profile: S.profile
   });
+}
+
+/* Moving the sessions onto different weekdays without rebuilding: the
+   split, the exercises and every set you have already logged stay
+   exactly as they are, because none of them depend on the calendar.
+   Sessions keep their order — the first session of the week lands on
+   the earliest day you picked — so a Push/Pull/Legs week stays in that
+   order however you shuffle the days it sits on. */
+function moveTrainingDays(list) {
+  const T = S.training;
+  if (!validDows(list, T.days)) return false;
+  T.dows = sortDows(list);
+  if (S.plan) {
+    S.plan.days.slice()
+      .sort((a, b) => a.idx - b.idx)
+      .forEach((day, i) => { day.dow = T.dows[i]; });
+  }
+  return true;
 }
 
 function buildAndGo() {
@@ -3899,7 +4322,7 @@ function plateGraphic(weight, barKg) {
    HUB: rest timer
    ============================================================ */
 function beep() {
-  if (S.mute) return;
+  if (!alertSound()) return;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
@@ -4001,8 +4424,8 @@ function paintTimer() {
     h('button', { class: 'btn btn--sm', onclick: stopTimer }, 'Done'),
     h('button', {
       class: 'btn btn--sm btn--ghost',
-      onclick: () => { S.mute = !S.mute; persist(); paintTimer(); }
-    }, S.mute ? 'Sound off' : 'Sound on')
+      onclick: () => { toggleAlertSound(); persist(); paintTimer(); paintPersonalize(); }
+    }, alertSound() ? 'Sound on' : 'Sound off')
   );
 
   timer.el = { root: root, arc: arc, label: labelEl, val: valEl, circ: C };
@@ -4670,7 +5093,7 @@ function paintStretch() {
    you can see what it buys. */
 function timeGate(day) {
   const full = sessionMinutes(day);
-  let picked = settings().defaultSessionMinutes || SESSION_MINUTES_DEFAULT;
+  let picked = SESSION_MINUTES_DEFAULT;
 
   const card = h('section', { class: 'card gate' });
   card.appendChild(h('p', { class: 'u-eyebrow', text: 'Before you start' }));
@@ -4832,7 +5255,7 @@ function exerciseCard(day, item, i) {
         if (e.done) {
           if (e.r == null) { e.r = item.reps[0]; rIn.value = item.reps[0]; }
           if (e.w == null && opening != null) { e.w = opening; wIn.value = fmtW(opening); }
-          if (settings().autoStartTimer) startTimer(effectiveRest(item.rest), 'Rest · ' + item.name);
+          startTimer(effectiveRest(item.rest), 'Rest · ' + item.name);
         }
         persist();
         repaintPlates();
@@ -5041,7 +5464,6 @@ function viewWeek() {
         }
       }, 'Try ' + nextSplit.name) : null,
       h('button', { class: 'btn btn--sm', onclick: () => goStep(2) }, 'Change days, time or focus'),
-      h('button', { class: 'btn btn--sm', onclick: () => window.print() }, 'Print the week'),
       h('button', { class: 'btn btn--sm btn--primary', onclick: startNewWeek }, 'Start week ' + (S.week + 1))
     ),
     h('p', { class: 'u-note', style: { marginTop: 'var(--s3)' } },
@@ -6192,8 +6614,7 @@ function runSelfTests() {
 
   /* ---------- how long have you got ---------- */
   t('the session question opens on 30 minutes', () => {
-    return SETTINGS_DEFAULTS.defaultSessionMinutes === SESSION_MINUTES_DEFAULT &&
-      SESSION_MINUTES_DEFAULT === 30 || 'default is ' + SESSION_MINUTES_DEFAULT;
+    return SESSION_MINUTES_DEFAULT === 30 || 'default is ' + SESSION_MINUTES_DEFAULT;
   });
   t('30 minutes is one of the offered answers', () => {
     return SESSION_MINUTE_CHOICES.indexOf(SESSION_MINUTES_DEFAULT) >= 0 || SESSION_MINUTE_CHOICES.join(',');
@@ -6295,12 +6716,162 @@ function runSelfTests() {
     return true;
   });
 
+  /* ---------- which days you train ---------- */
+  t('every default week is a usable set of days for its frequency', () => {
+    for (const n of Object.keys(DAY_MAP)) {
+      if (!validDows(DAY_MAP[n], Number(n))) return 'default week for ' + n + ' days is not valid';
+    }
+    return true;
+  });
+  t('a day list is rejected when it is the wrong length, repeats a day, or leaves the week', () => {
+    if (validDows([0, 1, 2], 4)) return 'accepted three days as four';
+    if (validDows([0, 0, 2, 4], 4)) return 'accepted Monday twice';
+    if (validDows([0, 1, 2, 9], 4)) return 'accepted a day outside the week';
+    if (validDows([0, 1, 2, 3.5], 4)) return 'accepted half a day';
+    if (validDows(null, 4)) return 'accepted nothing at all';
+    if (!validDows([4, 0, 2], 3)) return 'rejected a valid unsorted list';
+    return true;
+  });
+  t('an unusable day list falls back to the standard week rather than half-applying', () => {
+    const bad = dowsFor(4, [0, 0, 1]);
+    return (validDows(bad, 4) && bad.join() === DAY_MAP[4].join()) || bad.join();
+  });
+  t('a usable day list is kept, sorted', () => {
+    return dowsFor(3, [5, 1, 3]).join() === '1,3,5' || dowsFor(3, [5, 1, 3]).join();
+  });
+  t('the plan lands on exactly the days you picked, in order', () => {
+    const plan = buildPlan(cfg({ days: 3, dows: [1, 3, 6], splitId: null }));
+    const got = plan.days.slice().sort((a, b) => a.idx - b.idx).map(d => d.dow);
+    return got.join() === '1,3,6' || got.join();
+  });
+  t('picking different days gives you the same sessions on different days', () => {
+    const a = buildPlan(cfg({ days: 3, dows: [0, 2, 4], splitId: null }));
+    const b = buildPlan(cfg({ days: 3, dows: [1, 4, 6], splitId: null }));
+    const ids = p => p.days.map(d => d.items.map(i => i.exId).join('.')).join('|');
+    if (ids(a) !== ids(b)) return 'the exercises changed when only the calendar did';
+    return b.days.map(d => d.dow).join() === '1,4,6' || 'days did not move';
+  });
+  t('moving days in Settings keeps every exercise and every logged set', () => {
+    const savedPlan = S.plan, savedTraining = S.training, savedLog = S.log;
+    S.training = Object.assign({}, savedTraining, { days: 3, dows: [0, 2, 4], splitId: null });
+    S.plan = buildPlan(cfg({ days: 3, dows: [0, 2, 4], splitId: null }));
+    S.log = {};
+    const before = S.plan.days.map(d => d.items.map(i => i.exId).join('.')).join('|');
+    const moved = moveTrainingDays([1, 3, 5]);
+    const after = S.plan.days.map(d => d.items.map(i => i.exId).join('.')).join('|');
+    const dows = S.plan.days.slice().sort((a, b) => a.idx - b.idx).map(d => d.dow).join();
+    S.plan = savedPlan; S.training = savedTraining; S.log = savedLog;
+    if (!moved) return 'refused a valid move';
+    if (before !== after) return 'the exercises changed';
+    return dows === '1,3,5' || dows;
+  });
+  t('Settings will not add or drop a session, only move one', () => {
+    const savedPlan = S.plan, savedTraining = S.training;
+    S.training = Object.assign({}, savedTraining, { days: 3, dows: [0, 2, 4] });
+    S.plan = buildPlan(cfg({ days: 3, dows: [0, 2, 4], splitId: null }));
+    const two = moveTrainingDays([0, 2]);
+    const four = moveTrainingDays([0, 2, 4, 6]);
+    const stillThere = S.training.dows.join();
+    S.plan = savedPlan; S.training = savedTraining;
+    if (two || four) return 'accepted a different number of days';
+    return stillThere === '0,2,4' || stillThere;
+  });
+  t('changing how often you train clears this week but never your history', () => {
+    const savedPlan = S.plan, savedTraining = S.training, savedLog = S.log, savedHistory = S.history;
+    S.training = Object.assign({}, savedTraining, { days: 4, dows: DAY_MAP[4].slice(), splitId: null });
+    rebuildPlan();
+    S.log = { 0: { done: true, at: '2026-01-01', entries: {} } };
+    S.history = [{ date: '2026-01-01', name: 'Upper A' }];
+    setTrainingFrequency(3);
+    /* rendering the new week re-creates a blank log per day, so what
+       matters is that nothing carries a tick, not that the map is empty */
+    const marks = Object.keys(S.log).filter(k => {
+      const lg = S.log[k];
+      return lg.done || Object.keys(lg.entries || {}).some(id => lg.entries[id].some(e => e.done));
+    });
+    const ok = S.plan.days.length === 3 && marks.length === 0 && S.history.length === 1;
+    const detail = S.plan.days.length + ' days, ' + marks.length + ' still ticked, ' + S.history.length + ' in history';
+    S.plan = savedPlan; S.training = savedTraining; S.log = savedLog; S.history = savedHistory;
+    return ok || detail;
+  });
+  t('changing how often you train always produces a week of that size', () => {
+    for (let n = DAYS_MIN; n <= DAYS_MAX; n++) {
+      for (let m = DAYS_MIN; m <= DAYS_MAX; m++) {
+        const out = reshapeDows(DAY_MAP[n], m);
+        if (!validDows(out, m)) return n + ' days to ' + m + ' gave ' + out.join();
+      }
+    }
+    return true;
+  });
+  t('training more often adds a day rather than rearranging the ones you chose', () => {
+    const out = reshapeDows([1, 3, 5], 4);
+    return ([1, 3, 5].every(d => out.indexOf(d) !== -1) && out.length === 4) || out.join();
+  });
+  t('the week reads as a sentence, not a list of stubs', () => {
+    if (dowsSentence([0, 2, 4]) !== 'Mon, Wed and Fri') return dowsSentence([0, 2, 4]);
+    if (dowsSentence([6]) !== 'Sun') return dowsSentence([6]);
+    return dowsSentence([0, 1]) === 'Mon and Tue' || dowsSentence([0, 1]);
+  });
+  t('a plan code carries the days you picked across to another device', () => {
+    const saved = S.training;
+    S.training = Object.assign({}, saved, { days: 3, dows: [1, 3, 6] });
+    const code = planCode(S);
+    S.training = saved;
+    const into = { profile: {}, training: {}, log: {} };
+    const err = readPlanCode(code, into);
+    return (!err && into.training.dows.join() === '1,3,6') || (err || into.training.dows.join());
+  });
+  t('an older plan code with no days in it still opens, on the standard week', () => {
+    const legacy = CODE_PREFIX + utf8ToB64(JSON.stringify({
+      p: { sex: 'male', age: 24, height: 180, weight: 80 },
+      t: { days: 4, length: 60, experience: 'int', focus: [], equipment: EQUIP_PRESETS.basic.ids.slice(), splitId: null, shuffle: 0 }
+    })).replace(/=+$/, '');
+    const into = { profile: {}, training: {}, log: {} };
+    const err = readPlanCode(legacy, into);
+    return (!err && into.training.dows.join() === DAY_MAP[4].join()) || (err || into.training.dows.join());
+  });
+
   /* ---------- personalize ---------- */
+  t('an older save keeps its sound and buzz choices through the merge', () => {
+    const savedSettings = S.settings, savedMute = S.mute;
+    S.settings = { vibrate: false }; S.mute = true;
+    const a = settings().alert;
+    S.settings = { vibrate: true }; S.mute = true;
+    const b = settings().alert;
+    S.settings = { vibrate: false }; S.mute = false;
+    const c = settings().alert;
+    S.settings = savedSettings; S.mute = savedMute;
+    if (a !== 'off') return 'muted with no buzz became ' + a;
+    if (b !== 'buzz') return 'muted with buzz became ' + b;
+    return c === 'sound' || 'sound with no buzz became ' + c;
+  });
+  t('the timer’s sound button leaves the buzz alone', () => {
+    const savedSettings = S.settings;
+    S.settings = { alert: 'both' };
+    toggleAlertSound();
+    const off = settings().alert;
+    toggleAlertSound();
+    const on = settings().alert;
+    S.settings = savedSettings;
+    if (off !== 'buzz') return 'turning sound off gave ' + off;
+    return on === 'both' || 'turning it back on gave ' + on;
+  });
+  t('every alert mode agrees with what it turns on', () => {
+    const savedSettings = S.settings;
+    const want = { both: [true, true], sound: [true, false], buzz: [false, true], off: [false, false] };
+    for (const m of ALERT_MODES) {
+      S.settings = { alert: m.id };
+      const got = [alertSound(), alertBuzz()];
+      if (got.join() !== want[m.id].join()) { S.settings = savedSettings; return m.id + ' gave ' + got.join(); }
+    }
+    S.settings = savedSettings;
+    return true;
+  });
   t('settings() fills in defaults without touching what is already set', () => {
     const saved = S.settings;
     S.settings = { restAdjust: 30 };
     const st = settings();
-    const ok = st.restAdjust === 30 && st.autoStartTimer === true && st.vibrate === true && st.wakeLock === false;
+    const ok = st.restAdjust === 30 && st.alert === 'both' && st.showStretch === true && st.wakeLock === false;
     S.settings = saved;
     return ok || JSON.stringify(st);
   });
@@ -6308,7 +6879,7 @@ function runSelfTests() {
     const saved = S.settings;
     delete S.settings;
     const st = settings();
-    const ok = st.restAdjust === 0 && st.autoStartTimer === true;
+    const ok = st.restAdjust === 0 && st.alert === 'both';
     S.settings = saved;
     return ok || JSON.stringify(st);
   });
