@@ -20,7 +20,11 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'anvil-v2';
+/* Bumped whenever a cached asset changes behind a filename that does
+   not. The icons were recoloured in place, so without this an installed
+   copy would keep serving the old blue ones from the previous cache —
+   activate deletes every cache that is not this one. */
+const CACHE = 'anvil-v3';
 const SHELL = './index.html';
 const ASSETS = [
   './',
